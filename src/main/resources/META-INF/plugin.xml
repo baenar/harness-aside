@@ -16,4 +16,14 @@
                     factoryClass="com.github.baenar.claudeaside.ClaudeToolWindowFactory"/>
     </extensions>
 
+    <actions>
+        <action id="ClaudeAside.SendSelection"
+                class="com.github.baenar.claudeaside.SendSelectionToClaudeAction"
+                text="Send to Claude Aside"
+                description="Insert a reference to this file and selection into the active Claude terminal">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+
 </idea-plugin>
