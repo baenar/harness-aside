@@ -9,4 +9,11 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Claude Aside"
+                    anchor="right"
+                    icon="/icons/claudeAside.svg"
+                    factoryClass="com.github.baenar.claudeaside.ClaudeToolWindowFactory"/>
+    </extensions>
+
 </idea-plugin>
