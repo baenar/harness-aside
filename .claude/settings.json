@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf %s thinking \u003e \"$CLAUDE_PROJECT_DIR/.claude/aside-status\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf %s waiting \u003e \"$CLAUDE_PROJECT_DIR/.claude/aside-status\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf %s idle \u003e \"$CLAUDE_PROJECT_DIR/.claude/aside-status\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -14,6 +14,7 @@
                     anchor="right"
                     icon="/icons/claudeAside.svg"
                     factoryClass="com.github.baenar.claudeaside.ClaudeToolWindowFactory"/>
+        <notificationGroup id="Claude Aside" displayType="BALLOON"/>
     </extensions>
 
     <actions>

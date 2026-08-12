@@ -109,9 +109,9 @@ the same service.
 ## Development phases
 
 ### Phase 1 — MVP (the whole original problem)
-- [ ] Tool window `Claude Aside`, `anchor="right"`, 13×13 SVG icon (mono, per IJ guidelines)
-- [ ] `ClaudeTerminalService`: one terminal tab, working dir = project root, `sendCommandToExecute("claude -c")`
-- [ ] Manual test in `runIde` sandbox + real install into PyCharm/IntelliJ (WSL shell)
+- [x] Tool window `Claude Aside`, `anchor="right"`, 13×13 SVG icon (mono, per IJ guidelines)
+- [x] `ClaudeTerminalService`: one terminal tab, working dir = project root, `sendCommandToExecute("claude -c")`
+- [x] Manual test in `runIde` sandbox + real install into PyCharm/IntelliJ (WSL shell)
 
 No unit tests in this phase — after dropping the session lookup there is no pure logic
 left to test; everything is IDE wiring that only a manual run exercises.
@@ -125,11 +125,54 @@ left to test; everything is IDE wiring that only a manual run exercises.
 - [x] Send-selection-to-Claude editor action
 
 ### Phase 3 — Status
-- [ ] `ClaudeSessions`: path encoding (non-alphanumeric → `-`) + `*.jsonl` lookup, to
-      map a tab to its state file (unit-tested — the only pure logic in the plugin)
-- [ ] Hook installer (writes `Stop`/`Notification`/`PreToolUse` entries into project `.claude/settings.json`, with user consent)
-- [ ] State file watcher → tool window icon variants (idle / thinking / waiting) + tab icons
-- [ ] Balloon on "awaiting approval" when window hidden
+- [x] `ClaudeSessions`: path encoding (non-alphanumeric → `-`) + `*.jsonl` lookup
+      (unit-tested — the only pure logic in the plugin)
+- [x] Hook installer (writes `UserPromptSubmit`/`Notification`/`Stop` entries into project
+      `.claude/settings.json`, with user consent). Uses `UserPromptSubmit`→thinking rather
+      than `PreToolUse` — same "busy" signal, no tool-name matcher needed. Command is a
+      portable POSIX write to `$CLAUDE_PROJECT_DIR/.claude/aside-status`.
+- [x] State file watcher (NIO `WatchService`) → tool-window icon variants + tab icons
+      (coloured circles: amber=thinking, orange=waiting, green=idle)
+- [x] Balloon on "awaiting approval" when window hidden
+
+> Status is **project-level** for now: one indicator for the whole tool window, driven by
+> a single `.claude/aside-status` file. Per-tab status needs tab→session-id resolution
+> (the `claude -c` launch doesn't tell the plugin which session it picked) — deferred.
+> On a native Windows shell the POSIX hook command is a no-op, so status stays on the
+> default glyph there; targets WSL/macOS/Linux/Git-bash.
+
+**Known limitations (found in manual testing, not yet fixed):**
+- **Only correct with a single open tab.** One status file / one dot means two Claude
+  tabs stomp on the same indicator — whichever hook fired last wins, with no way to tell
+  which tab it refers to. Same root cause as the per-tab deferral above; a real fix needs
+  the tab→session mapping.
+- **Doesn't reset on Ctrl+C.** The `Stop` hook only fires on Claude's normal end-of-turn;
+  killing the running turn with Ctrl+C bypasses it, so the indicator sticks on
+  `thinking`/`waiting` even though Claude is idle again. No hook exists for "interrupted."
+- **Doesn't reset when the user answers "no" to a permission prompt.** `Notification`
+  fires when Claude asks for approval (→ `waiting`), but there's no hook for the *answer*
+  — a denial leaves the indicator stuck on `waiting` instead of returning to `idle`/`thinking`.
+
+Needs a real fix before Phase 3 is "done": candidates are a `PreToolUse`/`PostToolUse`
+pair to bracket tool calls more precisely, and/or a stale-status timeout in the watcher
+(e.g. treat a `waiting`/`thinking` status older than N seconds with no active pty as idle).
+
+### Phase 3.1 — Status correctness fixes
+- [ ] Per-tab status: resolve each tab to its session id (`ClaudeSessions.latestSessionId`
+      at launch time, or parse the session id Claude prints on the `claude`/`claude -c`
+      startup banner) and key the state file / indicator by session instead of by project,
+      so multiple open tabs no longer share one dot
+- [ ] Reset to idle on interrupt: detect Ctrl+C — either via
+      `TerminalWidget.addTerminationCallback` firing without a preceding `Stop`-hook write,
+      or a `PreToolUse`/`PostToolUse` hook pair bracketing tool calls narrowly enough that
+      an interrupt can't leave the indicator stuck mid-tool
+- [ ] Reset to idle when the user denies a permission prompt: no hook currently fires on
+      the *answer* to a `Notification`; needs either a stale-status timeout in the watcher
+      (treat `waiting`/`thinking` older than N seconds with no active pty as idle) or a
+      hook-format change once Claude Code exposes one
+- [ ] Manual test: two tabs open side by side, each showing its own correct status;
+      Ctrl+C during a tool call returns to idle; answering "no" to a permission prompt
+      returns to idle
 
 ### Phase 4 — MCP & polish
 - [ ] Auto-configure JetBrains MCP server for Claude
