@@ -1,11 +1,41 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" idle"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "printf %s thinking \u003e \"$CLAUDE_PROJECT_DIR/.claude/aside-status\""
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" thinking"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" thinking"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" thinking"
           }
         ]
       }
@@ -15,7 +45,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf %s waiting \u003e \"$CLAUDE_PROJECT_DIR/.claude/aside-status\""
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" waiting"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" waiting"
           }
         ]
       }
@@ -25,7 +65,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf %s idle \u003e \"$CLAUDE_PROJECT_DIR/.claude/aside-status\""
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" idle"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" end"
           }
         ]
       }

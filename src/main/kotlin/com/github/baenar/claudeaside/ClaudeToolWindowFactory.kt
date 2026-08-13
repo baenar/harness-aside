@@ -12,10 +12,9 @@ import com.intellij.openapi.wm.ToolWindowFactory
 /**
  * Opens a terminal in the right-docked tool window and starts Claude Code in it.
  *
- * `claude -c` resumes the last session for this directory and silently starts a fresh
- * one when there is none, so no session lookup is needed here. Tab management and the
- * launch itself live in [ClaudeTerminalService]; the status indicator in
- * [ClaudeStatusService].
+ * The first tab resumes this directory's most recent session, or starts a fresh one when
+ * there is none. Tab management and the launch itself live in [ClaudeTerminalService];
+ * the status indicator in [ClaudeStatusService].
  */
 class ClaudeToolWindowFactory : ToolWindowFactory {
 
@@ -28,9 +27,9 @@ class ClaudeToolWindowFactory : ToolWindowFactory {
             )
         )
         toolWindow.setAdditionalGearActions(DefaultActionGroup(EnableStatusHooksAction(project)))
-        project.service<ClaudeTerminalService>().openTab(toolWindow, "claude -c")
 
         project.service<ClaudeStatusService>().ensureStarted()
+        project.service<ClaudeTerminalService>().openContinuedSession(toolWindow)
         offerStatusHooks(project)
     }
 

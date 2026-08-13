@@ -28,9 +28,11 @@ Verified against `claude` 2.1.228 on this machine.
 | `claude -r` / `--resume` | resumes by session id, or opens the built-in interactive picker |
 | `claude --fork-session` | on resume, branches into a new session id |
 
-Launch command on tool window open: **always `claude -c`**. Since `-c` degrades to a
-fresh session on its own, the plugin needs no session lookup and no path encoding in
-Phase 1. Path encoding is only needed in Phase 3, to map a session to its state file.
+Launch command on tool window open: **`claude -c`** through Phase 3 — since `-c` degrades
+to a fresh session on its own, Phase 1 needs no session lookup and no path encoding.
+Phase 3.1 replaces it with `-r <id>` / `--session-id <uuid>`: `-c` never reveals *which*
+session it resumed, and per-tab status needs that. Path encoding is what maps a session to
+its state and transcript files.
 
 > Note: the first launch in a directory the user has not opened before shows Claude's
 > "Is this a project you trust?" prompt instead of the session. Expected, not a bug —
@@ -135,44 +137,92 @@ left to test; everything is IDE wiring that only a manual run exercises.
       (coloured circles: amber=thinking, orange=waiting, green=idle)
 - [x] Balloon on "awaiting approval" when window hidden
 
-> Status is **project-level** for now: one indicator for the whole tool window, driven by
-> a single `.claude/aside-status` file. Per-tab status needs tab→session-id resolution
-> (the `claude -c` launch doesn't tell the plugin which session it picked) — deferred.
 > On a native Windows shell the POSIX hook command is a no-op, so status stays on the
 > default glyph there; targets WSL/macOS/Linux/Git-bash.
 
-**Known limitations (found in manual testing, not yet fixed):**
-- **Only correct with a single open tab.** One status file / one dot means two Claude
-  tabs stomp on the same indicator — whichever hook fired last wins, with no way to tell
-  which tab it refers to. Same root cause as the per-tab deferral above; a real fix needs
-  the tab→session mapping.
-- **Doesn't reset on Ctrl+C.** The `Stop` hook only fires on Claude's normal end-of-turn;
-  killing the running turn with Ctrl+C bypasses it, so the indicator sticks on
-  `thinking`/`waiting` even though Claude is idle again. No hook exists for "interrupted."
-- **Doesn't reset when the user answers "no" to a permission prompt.** `Notification`
-  fires when Claude asks for approval (→ `waiting`), but there's no hook for the *answer*
-  — a denial leaves the indicator stuck on `waiting` instead of returning to `idle`/`thinking`.
-
-Needs a real fix before Phase 3 is "done": candidates are a `PreToolUse`/`PostToolUse`
-pair to bracket tool calls more precisely, and/or a stale-status timeout in the watcher
-(e.g. treat a `waiting`/`thinking` status older than N seconds with no active pty as idle).
+Manual testing then surfaced three problems, all fixed in Phase 3.1: one status file per
+*project* meant two tabs stomped on the same dot; Ctrl+C left the indicator stuck on
+`thinking` because `Stop` only fires on a normal end-of-turn; and denying a permission
+prompt left it stuck on `waiting` because no hook fires on the *answer*.
 
 ### Phase 3.1 — Status correctness fixes
-- [ ] Per-tab status: resolve each tab to its session id (`ClaudeSessions.latestSessionId`
-      at launch time, or parse the session id Claude prints on the `claude`/`claude -c`
-      startup banner) and key the state file / indicator by session instead of by project,
-      so multiple open tabs no longer share one dot
-- [ ] Reset to idle on interrupt: detect Ctrl+C — either via
-      `TerminalWidget.addTerminationCallback` firing without a preceding `Stop`-hook write,
-      or a `PreToolUse`/`PostToolUse` hook pair bracketing tool calls narrowly enough that
-      an interrupt can't leave the indicator stuck mid-tool
-- [ ] Reset to idle when the user denies a permission prompt: no hook currently fires on
-      the *answer* to a `Notification`; needs either a stale-status timeout in the watcher
-      (treat `waiting`/`thinking` older than N seconds with no active pty as idle) or a
-      hook-format change once Claude Code exposes one
+
+**More facts (verified against `claude` 2.1.229 and the hooks reference):**
+
+| Fact | Detail |
+|---|---|
+| `claude --session-id <uuid>` | starts a session under an id the caller picks — removes all session-id guessing |
+| Hook stdin payload | every event carries `session_id`, `cwd`, `transcript_path`, `hook_event_name` as JSON on stdin |
+| `PermissionRequest` hook | fires exactly when a tool call needs a permission decision (a plain command hook can't alter the decision — exit 2 is not honoured there) |
+| `Pre`/`PostToolUse` hooks | bracket each tool call; `PostToolUse` is what makes an *approved* tool return the tab to `thinking` |
+| Interrupts fire **no** hook | Ctrl+C and Esc-denying a permission prompt are invisible to hooks — confirmed in the reference and by testing |
+| …but they are recorded | Claude appends a `type:"user"` transcript entry reading `[Request interrupted by user]` (or `…for tool use]` for a denied tool) — verified in real `~/.claude/projects/*/*.jsonl` files on this machine |
+
+- [x] Per-tab status: every tab is launched with a **known** session id — `--session-id
+      <uuid>` for a new session, `-r <id>` for a resumed one — instead of bare `claude -c`,
+      which picks a session without saying which. Hooks write
+      `.claude/aside-status/<session-id>`, tabs carry their own dot icon, and the stripe
+      button shows the most urgent state across tabs (waiting > thinking > idle)
+- [x] Reset to idle on interrupt: the plugin tails each open tab's transcript and treats a
+      trailing `[Request interrupted by user…]` record as "back to idle", applying each
+      record once (keyed by its entry uuid). Rejected the alternatives — a stale-status
+      timeout guesses wrong during long thinking, and `addTerminationCallback` only fires
+      when the whole pty dies, not when a turn is cut short
+- [x] Reset to idle when the user denies a permission prompt: same mechanism — a denial is
+      recorded as `[Request interrupted by user for tool use]`. Added `PermissionRequest` →
+      `waiting` and `Post`/`PreToolUse` → `thinking` so an *approved* tool also recovers,
+      which the `Notification`→`Stop` pair alone never did
 - [ ] Manual test: two tabs open side by side, each showing its own correct status;
       Ctrl+C during a tool call returns to idle; answering "no" to a permission prompt
       returns to idle
+
+> Upgrading needs one click: **⚙ → Reinstall Status Indicator Hooks**. Install now writes a
+> generated `.claude/aside-status.sh` (POSIX, `sed` not `jq`, so no extra dependency on
+> macOS or Git-bash) and *replaces* entries from older plugin versions instead of appending
+> to them. The script is exercised by a unit test that runs it through a real `sh`.
+
+**Remaining limitation:** the transcript tail is read from
+`~/.claude/projects/<encoded>/`, resolved with the IDE's idea of `$HOME`. If the IDE runs
+on Windows while Claude runs under WSL, the two disagree and interrupt detection silently
+does nothing — hook-driven states still work. Same UNC/WSL path issue already tracked in
+Risks below.
+
+### Phase 3.2 — One animated icon instead of per-tab dots
+
+Per-tab dots were a dead end. `Content.setIcon` alone paints nothing on a tool-window tab:
+the platform needs the opt-in `ToolWindow.SHOW_CONTENT_ICON` (`Key<Boolean>`, verified in
+`app-client.jar` of IC-2025.2.6). Even opting in, a single tab shows no tab strip at all,
+so the common case was still one dot. Dropped the idea rather than fight it.
+
+- [x] **One button, one state — the first open tab's.** Extra tabs still open and run, they
+      just don't drive the icon; when the first tab closes the next-oldest takes over
+- [x] **Three looks, no compositing.** No glyph-plus-dot layering; each state is its own
+      artwork, all generated from the one glyph by `tools/generate-icons.sh`:
+      | State | Look |
+      |---|---|
+      | idle / unknown | glyph centred, still |
+      | thinking | glyph walks — slides off the right edge, re-enters from the left (painted twice a width apart so the button is never empty) |
+      | waiting | glyph upside down, rocking side to side so its legs kick |
+- [x] **Always white.** The glyph no longer uses Claude orange (`#D97757`), and the
+      `_dark` variant is gone — one file, one colour, both themes
+- [ ] Manual test: walking loop is smooth and never blank; kicking reads as kicking;
+      icon returns to still-and-centred when Claude finishes
+
+> **Frames must be real icon files.** The first attempt kept one SVG and derived each frame
+> at paint time from a custom `javax.swing.Icon` applying `Graphics2D` transforms. On a
+> tool-window button that renders at the wrong size and throws — the icon visibly shrank to
+> a frozen, clipped frame and the IDE raised an error balloon. `tools/generate-icons.sh`
+> now bakes 12 walk + 8 kick frames into SVGs loaded through `IconLoader`, the same path as
+> every icon that has ever worked here. `ClaudeStatusService` also stops the loop and falls
+> back to the still glyph if a frame ever fails to paint, so a decoration can't keep
+> throwing at the user.
+>
+> Frames are pushed with `ToolWindow.setIcon` on a ~14 fps Swing timer. The tidier-looking
+> `com.intellij.ui.AnimatedIcon` was rejected: it repaints through the component it is
+> painted on (unverified for stripe buttons) and is `@ApiStatus.Experimental`, whereas
+> `setIcon` is already proven to repaint here.
+>
+> White-on-white is a real risk in light themes — revisit if the button ever disappears.
 
 ### Phase 4 — MCP & polish
 - [ ] Auto-configure JetBrains MCP server for Claude

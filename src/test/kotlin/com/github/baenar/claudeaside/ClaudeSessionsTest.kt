@@ -56,4 +56,48 @@ class ClaudeSessionsTest {
 
         assertEquals("newer-session", ClaudeSessions.latestSessionId(home.toString(), projectPath))
     }
+
+    @Test
+    fun `transcriptPath names the file after the session id`() {
+        val path = ClaudeSessions.transcriptPath("/home/x", "/home/x/proj", "abc-123")
+        assertEquals("abc-123.jsonl", path.name)
+        assertEquals("-home-x-proj", path.parent.name)
+    }
+
+    @Test
+    fun `lastNonBlankLine skips trailing newlines`() {
+        assertEquals("second", ClaudeSessions.lastNonBlankLine("first\nsecond\n\n"))
+        assertNull(ClaudeSessions.lastNonBlankLine("\n  \n"))
+    }
+
+    // The samples below are real transcript lines, trimmed: verified against
+    // ~/.claude/projects/*/*.jsonl on this machine.
+
+    @Test
+    fun `interruptUuid reads the uuid of a plain Ctrl-C interrupt`() {
+        val line = """{"parentUuid":"15479a1e","isSidechain":false,"type":"user",""" +
+            """"message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]},""" +
+            """"uuid":"b88c27c5-1299-42f1-bba8-70213a994223","timestamp":"2026-07-17T18:11:00Z"}"""
+        assertEquals("b88c27c5-1299-42f1-bba8-70213a994223", ClaudeSessions.interruptUuid(line))
+    }
+
+    @Test
+    fun `interruptUuid reads the uuid of a denied permission prompt`() {
+        // Answering "no" to a tool approval is recorded as an interrupt, not as a Stop hook.
+        val line = """{"parentUuid":"0699c839","isSidechain":false,"type":"user",""" +
+            """"message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]},""" +
+            """"uuid":"07ebd885-4d52-48f2-8502-a048090c4429","timestamp":"2026-07-17T18:12:00Z"}"""
+        assertEquals("07ebd885-4d52-48f2-8502-a048090c4429", ClaudeSessions.interruptUuid(line))
+    }
+
+    @Test
+    fun `interruptUuid ignores ordinary records`() {
+        val prompt = """{"type":"user","message":{"role":"user","content":"build it"},"uuid":"aaa"}"""
+        assertNull(ClaudeSessions.interruptUuid(prompt))
+
+        // Claude quoting the marker back at us must not count as an interrupt.
+        val assistant = """{"type":"assistant","message":{"role":"assistant","content":""" +
+            """[{"type":"text","text":"you saw [Request interrupted by user] earlier"}]},"uuid":"bbb"}"""
+        assertNull(ClaudeSessions.interruptUuid(assistant))
+    }
 }

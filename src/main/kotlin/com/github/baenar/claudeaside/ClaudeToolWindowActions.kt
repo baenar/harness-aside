@@ -16,19 +16,23 @@ class NewClaudeSessionAction(private val toolWindow: ToolWindow) :
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        project.service<ClaudeTerminalService>().openTab(toolWindow, "claude")
+        project.service<ClaudeTerminalService>().openNewSession(toolWindow)
     }
 }
 
-/** Title-bar action: close the current tab and open a fresh resumed one (`claude -c`). */
+/** Title-bar action: close the current tab and reopen it resuming the same session. */
 class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
-    AnAction("Restart Tab", "Close this tab and start Claude again resuming the last session", AllIcons.Actions.Restart) {
+    AnAction("Restart Tab", "Close this tab and start Claude again resuming its session", AllIcons.Actions.Restart) {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val cm = toolWindow.contentManager
-        cm.selectedContent?.let { cm.removeContent(it, true) }
-        project.service<ClaudeTerminalService>().openTab(toolWindow, "claude -c")
+        val closed = cm.selectedContent
+        // Resume exactly what this tab was running, not merely the newest session in the
+        // project — with several tabs open those are rarely the same conversation.
+        val sessionId = ClaudeTerminalService.sessionIdOf(closed)
+        closed?.let { cm.removeContent(it, true) }
+        project.service<ClaudeTerminalService>().openContinuedSession(toolWindow, sessionId)
     }
 
     override fun update(e: AnActionEvent) {
