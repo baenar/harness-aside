@@ -65,10 +65,75 @@ class ClaudeSessionsTest {
     }
 
     @Test
-    fun `lastNonBlankLine skips trailing newlines`() {
-        assertEquals("second", ClaudeSessions.lastNonBlankLine("first\nsecond\n\n"))
-        assertNull(ClaudeSessions.lastNonBlankLine("\n  \n"))
+    fun `lastInterruptUuid finds an interrupt that is not the last line`() {
+        // The regression this guards: Claude appends bookkeeping records within
+        // milliseconds of an interrupt, so requiring it to be the final line found nothing
+        // and the icon stayed stuck on "thinking" after Ctrl+C.
+        val transcript = listOf(
+            assistantLine("working on it"),
+            interruptLine("[Request interrupted by user]", "int-1"),
+            """{"type":"system","content":"post-interrupt bookkeeping","uuid":"sys-1"}""",
+            """{"type":"last-prompt","uuid":"lp-1"}""",
+            """{"type":"total_tokens_reminder","uuid":"tok-1"}""",
+        ).joinToString("\n")
+
+        assertEquals("int-1", ClaudeSessions.lastInterruptUuid(transcript))
     }
+
+    @Test
+    fun `lastInterruptUuid reports the newest of several interrupts`() {
+        val transcript = listOf(
+            interruptLine("[Request interrupted by user]", "old"),
+            """{"type":"user","message":{"role":"user","content":"carry on"},"uuid":"prompt"}""",
+            interruptLine("[Request interrupted by user for tool use]", "new"),
+            """{"type":"system","uuid":"sys"}""",
+        ).joinToString("\n")
+
+        assertEquals("new", ClaudeSessions.lastInterruptUuid(transcript))
+    }
+
+    @Test
+    fun `lastInterruptUuid finds nothing in an uninterrupted transcript`() {
+        val transcript = listOf(
+            """{"type":"user","message":{"role":"user","content":"build it"},"uuid":"a"}""",
+            assistantLine("done"),
+        ).joinToString("\n")
+
+        assertNull(ClaudeSessions.lastInterruptUuid(transcript))
+        assertNull(ClaudeSessions.lastInterruptUuid(""))
+    }
+
+    @Test
+    fun `records that merely mention an interrupt are not interrupts`() {
+        // Measured on this project's own transcript: matching the bare phrase found 27
+        // "interrupts" where 5 were real. The rest were the assistant's own tool calls —
+        // greps for the phrase, and test files containing it — where the marker sits inside
+        // an escaped JSON string one level deeper.
+        val toolCall = """{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use",""" +
+            """"name":"Bash","input":{"command":"grep 'Request interrupted by user' transcript.jsonl"}}]},""" +
+            """"uuid":"tool-call"}"""
+        assertNull(ClaudeSessions.interruptUuid(toolCall))
+
+        val writingATestFile = """{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write",""" +
+            """"input":{"content":"{\"type\":\"user\",\"text\":\"[Request interrupted by user]\"}"}}]},""" +
+            """"uuid":"write-call"}"""
+        assertNull("escaped quotes mean this record only talks about an interrupt", ClaudeSessions.interruptUuid(writingATestFile))
+    }
+
+    @Test
+    fun `lastInterruptUuid ignores a truncated leading line`() {
+        // Only the tail of a transcript is read, so the first line is usually cut in half.
+        val transcript = "d by user]\"}]},\"uuid\":\"chopped\"}\n" + assistantLine("hello")
+        assertNull(ClaudeSessions.lastInterruptUuid(transcript))
+    }
+
+    private fun interruptLine(text: String, uuid: String) =
+        """{"parentUuid":"p","isSidechain":false,"type":"user",""" +
+            """"message":{"role":"user","content":[{"type":"text","text":"$text"}]},""" +
+            """"uuid":"$uuid","timestamp":"2026-08-14T00:00:00Z"}"""
+
+    private fun assistantLine(text: String) =
+        """{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"$text"}]},"uuid":"asst"}"""
 
     // The samples below are real transcript lines, trimmed: verified against
     // ~/.claude/projects/*/*.jsonl on this machine.

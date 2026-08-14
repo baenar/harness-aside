@@ -1,15 +1,23 @@
 # Builds the plugin, runs tests, and runs the IntelliJ Plugin Verifier.
-# Triggered on pushes to 'main' and on any pull request.
+# Triggered on pushes to 'main', on any pull request, and manually.
+#
+# Tests run on Linux *and* Windows on purpose: several of them shell out to `sh` (the hook
+# reporter script) and the Windows leg is the only one exercising the Git-for-Windows
+# fallback that this plugin's users actually depend on.
 
 name: Build
 on:
   push:
     branches: [ main ]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
 
@@ -46,11 +54,20 @@ jobs:
           path: ./build/distributions/*.zip
 
   test:
-    name: Test
+    name: Test (${{ matrix.os }})
     needs: [ build ]
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # `./gradlew` rather than the .bat on both, so the steps stay identical
+        shell: bash
     steps:
       - name: Maximize Build Space
+        if: runner.os == 'Linux'
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
           tool-cache: false
@@ -73,12 +90,40 @@ jobs:
       - name: Run Tests
         run: ./gradlew check
 
+      # The hook reporter script is only covered when a POSIX shell is present; without
+      # this the suite would quietly skip those tests and still report success.
+      - name: Assert no tests were skipped
+        if: ${{ !cancelled() }}
+        run: |
+          skipped=$(grep -ho 'skipped="[0-9]*"' build/test-results/test/*.xml \
+            | grep -o '[0-9]*' | awk '{ total += $1 } END { print total + 0 }')
+          echo "skipped tests: $skipped"
+          test "$skipped" -eq 0
+
       - name: Collect Tests Result
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
-          name: tests-result
+          name: tests-result-${{ matrix.os }}
           path: ${{ github.workspace }}/build/reports/tests
+
+  icons:
+    name: Icons match their generator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v6
+
+      # Ubuntu ships mawk; the frames were generated with GNU awk and its float formatting
+      # has to match byte for byte for the diff below to mean anything.
+      - name: Install GNU awk
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gawk
+
+      - name: Regenerate and compare
+        run: |
+          LC_ALL=C sh tools/generate-icons.sh
+          git diff --exit-code -- src/main/resources/icons \
+            || { echo "::error::Committed icons differ from tools/generate-icons.sh output — rerun it and commit."; exit 1; }
 
   verify:
     name: Verify plugin
