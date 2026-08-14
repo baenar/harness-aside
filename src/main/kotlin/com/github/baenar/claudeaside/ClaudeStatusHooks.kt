@@ -15,25 +15,22 @@ import java.nio.file.Paths
  *
  * Every hook runs the same generated POSIX script ([SCRIPT_FILE]) with the status word as
  * its only argument. The script reads the `session_id` Claude passes on the hook's stdin,
- * so each Claude tab gets its own state file and open tabs no longer share one indicator.
- * On a native Windows shell (no `sh`) the hook is a no-op and status stays on the default
- * icon — the feature degrades gracefully, as planned.
+ * so each Claude tab gets its own state file. On a native Windows shell (no `sh`) the hook
+ * is a no-op and status stays on the default icon — the feature degrades gracefully.
+ *
+ * Takes a directory rather than a `Project` so the merge behaviour can be tested directly.
  */
-class ClaudeStatusHooks(private val project: Project) {
+class ClaudeStatusHooks(private val claudeDir: Path) {
 
-    private fun settingsPath(): Path? {
-        val base = project.basePath ?: return null
-        return Paths.get(base, CLAUDE_DIR, "settings.json")
-    }
+    private val settingsPath: Path get() = claudeDir.resolve("settings.json")
 
     /** True when our status hooks are already present in the project settings. */
     fun isInstalled(): Boolean {
-        val path = settingsPath() ?: return false
-        if (!Files.exists(path)) return false
+        if (!Files.exists(settingsPath)) return false
         return try {
-            JsonParser.parseString(Files.readString(path)).toString().contains(SCRIPT_FILE)
+            JsonParser.parseString(Files.readString(settingsPath)).toString().contains(SCRIPT_FILE)
         } catch (e: Exception) {
-            LOG.warn("Could not read $path", e)
+            LOG.warn("Could not read $settingsPath", e)
             false
         }
     }
@@ -45,61 +42,33 @@ class ClaudeStatusHooks(private val project: Project) {
      *
      * @return true on success.
      */
-    fun install(): Boolean {
-        val settings = settingsPath() ?: return false
-        return try {
-            val claudeDir = settings.parent
-            Files.createDirectories(claudeDir)
-            migrateStatusFile(claudeDir)
-            Files.writeString(claudeDir.resolve(SCRIPT_FILE), SCRIPT)
+    fun install(): Boolean = try {
+        Files.createDirectories(claudeDir)
+        migrateStatusFile()
+        Files.writeString(claudeDir.resolve(SCRIPT_FILE), SCRIPT)
 
-            val root = if (Files.exists(settings)) {
-                JsonParser.parseString(Files.readString(settings)).asJsonObject
-            } else {
-                JsonObject()
-            }
-            val hooks = root.getAsJsonObject("hooks") ?: JsonObject().also { root.add("hooks", it) }
-            for (event in hooks.keySet().toList()) {
-                dropOurEntries(hooks, event)
-            }
-            for ((event, word) in EVENT_TO_WORD) {
-                addHook(hooks, event, "sh \"\$CLAUDE_PROJECT_DIR/$CLAUDE_DIR/$SCRIPT_FILE\" $word")
-            }
-            val json = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
-            Files.writeString(settings, json.toJson(root))
-            true
-        } catch (e: Exception) {
-            LOG.warn("Could not install Claude Aside hooks into $settings", e)
-            false
+        val root = if (Files.exists(settingsPath)) {
+            JsonParser.parseString(Files.readString(settingsPath)).asJsonObject
+        } else {
+            JsonObject()
         }
+        Files.writeString(settingsPath, GSON.toJson(merge(root)))
+        true
+    } catch (e: Exception) {
+        LOG.warn("Could not install Claude Aside hooks into $settingsPath", e)
+        false
     }
 
     /** Pre-3.1 installs wrote a single status *file* where the per-session directory now goes. */
-    private fun migrateStatusFile(claudeDir: Path) {
+    private fun migrateStatusFile() {
         val status = claudeDir.resolve(STATUS_DIR)
         if (Files.isRegularFile(status)) Files.delete(status)
     }
 
-    /** Removes hook entries this plugin installed, so reinstalling upgrades instead of duplicating. */
-    private fun dropOurEntries(hooks: JsonObject, event: String) {
-        val list = hooks.getAsJsonArray(event) ?: return
-        val kept = JsonArray()
-        list.filterNot { it.toString().contains(MARKER) }.forEach { kept.add(it) }
-        if (kept.isEmpty) hooks.remove(event) else hooks.add(event, kept)
-    }
-
-    /** Appends one `{ "hooks": [ { "type": "command", "command": … } ] }` entry. */
-    private fun addHook(hooks: JsonObject, event: String, command: String) {
-        val list = hooks.getAsJsonArray(event) ?: JsonArray().also { hooks.add(event, it) }
-        val commandObj = JsonObject().apply {
-            addProperty("type", "command")
-            addProperty("command", command)
-        }
-        list.add(JsonObject().apply { add("hooks", JsonArray().apply { add(commandObj) }) })
-    }
-
     companion object {
         private val LOG = logger<ClaudeStatusHooks>()
+        private val GSON = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
+
         const val CLAUDE_DIR = ".claude"
 
         /** Directory holding one file per session, named after the session id. */
@@ -112,13 +81,48 @@ class ClaudeStatusHooks(private val project: Project) {
         /** Word the script writes for `end` — the session is over, drop its state file. */
         private const val END = "end"
 
+        fun forProject(project: Project): ClaudeStatusHooks? =
+            project.basePath?.let { ClaudeStatusHooks(Paths.get(it, CLAUDE_DIR)) }
+
+        /**
+         * Adds our hooks to [root], dropping entries from earlier plugin versions so that
+         * reinstalling upgrades instead of duplicating, and leaving everything else alone.
+         */
+        fun merge(root: JsonObject): JsonObject {
+            val hooks = root.getAsJsonObject("hooks") ?: JsonObject().also { root.add("hooks", it) }
+            for (event in hooks.keySet().toList()) {
+                dropOurEntries(hooks, event)
+            }
+            for ((event, word) in EVENT_TO_WORD) {
+                addHook(hooks, event, "sh \"\$CLAUDE_PROJECT_DIR/$CLAUDE_DIR/$SCRIPT_FILE\" $word")
+            }
+            return root
+        }
+
+        private fun dropOurEntries(hooks: JsonObject, event: String) {
+            val list = hooks.getAsJsonArray(event) ?: return
+            val kept = JsonArray()
+            list.filterNot { it.toString().contains(MARKER) }.forEach { kept.add(it) }
+            if (kept.isEmpty) hooks.remove(event) else hooks.add(event, kept)
+        }
+
+        /** Appends one `{ "hooks": [ { "type": "command", "command": … } ] }` entry. */
+        private fun addHook(hooks: JsonObject, event: String, command: String) {
+            val list = hooks.getAsJsonArray(event) ?: JsonArray().also { hooks.add(event, it) }
+            val commandObj = JsonObject().apply {
+                addProperty("type", "command")
+                addProperty("command", command)
+            }
+            list.add(JsonObject().apply { add("hooks", JsonArray().apply { add(commandObj) }) })
+        }
+
         /**
          * Claude hook event → status word.
          *
          * `PreToolUse`/`PostToolUse` are what make approvals recover: without them the
          * indicator stayed on `waiting` from the approval prompt until the whole turn ended.
          */
-        private val EVENT_TO_WORD = linkedMapOf(
+        internal val EVENT_TO_WORD = linkedMapOf(
             "SessionStart" to ClaudeStatus.IDLE.word,
             "UserPromptSubmit" to ClaudeStatus.THINKING.word,
             "PreToolUse" to ClaudeStatus.THINKING.word,

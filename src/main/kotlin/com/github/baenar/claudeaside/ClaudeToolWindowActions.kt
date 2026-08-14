@@ -60,6 +60,30 @@ class RemoveClaudeTabAction(private val toolWindow: ToolWindow) :
 }
 
 /**
+ * Gear-menu action: reports what the status indicator currently believes.
+ *
+ * The indicator depends on a shell script, a file watcher, a transcript and a key
+ * listener, none of which are visible when one of them goes quiet. This turns "the icon is
+ * wrong" into a specific broken link.
+ */
+class DiagnoseStatusAction(private val project: Project) :
+    AnAction("Diagnose Status Indicator", "Show what the status indicator currently sees", AllIcons.General.Information) {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup(ClaudeStatusService.NOTIFICATION_GROUP)
+            .createNotification(
+                "Claude Aside status",
+                project.service<ClaudeStatusService>().describeState().replace("\n", "<br/>"),
+                NotificationType.INFORMATION,
+            )
+            .notify(project)
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+}
+
+/**
  * Gear-menu action: installs (or reinstalls) the Claude Code hooks that drive the status
  * indicator. Available any time, so status can be enabled without relying on the one-time
  * startup notification.
@@ -68,8 +92,7 @@ class EnableStatusHooksAction(private val project: Project) :
     AnAction("Enable Status Indicator (Install Hooks)", "Add status hooks to .claude/settings.json", AllIcons.General.Settings) {
 
     override fun actionPerformed(e: AnActionEvent) {
-        val hooks = ClaudeStatusHooks(project)
-        val ok = hooks.install()
+        val ok = ClaudeStatusHooks.forProject(project)?.install() ?: false
         NotificationGroupManager.getInstance()
             .getNotificationGroup(ClaudeStatusService.NOTIFICATION_GROUP)
             .createNotification(
@@ -81,7 +104,7 @@ class EnableStatusHooksAction(private val project: Project) :
     }
 
     override fun update(e: AnActionEvent) {
-        val installed = ClaudeStatusHooks(project).isInstalled()
+        val installed = ClaudeStatusHooks.forProject(project)?.isInstalled() ?: false
         e.presentation.text =
             if (installed) "Reinstall Status Indicator Hooks" else "Enable Status Indicator (Install Hooks)"
     }

@@ -32,8 +32,8 @@ class ClaudeTerminalService(private val project: Project) {
 
     /** Opens a tab running a brand-new session under a freshly minted id. */
     fun openNewSession(toolWindow: ToolWindow) {
-        val sessionId = UUID.randomUUID().toString()
-        openTab(toolWindow, "claude --session-id $sessionId", sessionId)
+        val launch = Launch.new()
+        openTab(toolWindow, launch.command, launch.sessionId)
     }
 
     /**
@@ -45,8 +45,8 @@ class ClaudeTerminalService(private val project: Project) {
         val resumed = sessionId ?: project.basePath?.let {
             ClaudeSessions.latestSessionId(System.getProperty("user.home"), it)
         }
-        if (resumed == null) openNewSession(toolWindow)
-        else openTab(toolWindow, "claude -r $resumed", resumed)
+        val launch = Launch.resumeOrNew(resumed)
+        openTab(toolWindow, launch.command, launch.sessionId)
     }
 
     /**
@@ -73,10 +73,16 @@ class ClaudeTerminalService(private val project: Project) {
         content.putUserData(SESSION_KEY, sessionId)
 
         val status = project.service<ClaudeStatusService>()
-        sessionId?.let { status.registerTab(it, content) }
+        // Scoped to this tab: the key watcher must go when the tab does.
+        val tabScope = Disposer.newDisposable("Claude Aside tab")
+        sessionId?.let {
+            status.registerTab(it, content)
+            status.watchInterruptKeys(widget.component, it, tabScope)
+        }
         // Closing the tab disposes the widget, terminating the pty.
         content.setDisposer {
             sessionId?.let { status.unregisterTab(it) }
+            Disposer.dispose(tabScope)
             Disposer.dispose(widget)
         }
 
@@ -102,6 +108,23 @@ class ClaudeTerminalService(private val project: Project) {
             }
         }
         widget.requestFocus()
+    }
+
+    /**
+     * A shell command plus the session id it will run under.
+     *
+     * Bare `claude -c` is deliberately never used: it resumes without telling anyone which
+     * session it picked, and [ClaudeStatusService] needs that id to match a tab to its
+     * state file and transcript.
+     */
+    data class Launch(val command: String, val sessionId: String) {
+        companion object {
+            fun new(sessionId: String = UUID.randomUUID().toString()): Launch =
+                Launch("claude --session-id $sessionId", sessionId)
+
+            fun resumeOrNew(sessionId: String?): Launch =
+                if (sessionId == null) new() else Launch("claude -r $sessionId", sessionId)
+        }
     }
 
     companion object {

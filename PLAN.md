@@ -205,7 +205,7 @@ so the common case was still one dot. Dropped the idea rather than fight it.
       | waiting | glyph upside down, rocking side to side so its legs kick |
 - [x] **Always white.** The glyph no longer uses Claude orange (`#D97757`), and the
       `_dark` variant is gone — one file, one colour, both themes
-- [ ] Manual test: walking loop is smooth and never blank; kicking reads as kicking;
+- [x] Manual test: walking loop is smooth and never blank; kicking reads as kicking;
       icon returns to still-and-centred when Claude finishes
 
 > **Frames must be real icon files.** The first attempt kept one SVG and derived each frame
@@ -223,6 +223,81 @@ so the common case was still one dot. Dropped the idea rather than fight it.
 > `setIcon` is already proven to repaint here.
 >
 > White-on-white is a real risk in light themes — revisit if the button ever disappears.
+
+### Phase 3.3 — Interrupt detection actually fires, and a test suite
+
+The Ctrl+C reset never worked, and the reason was an assumption, not a race: the code
+asked "is the newest transcript line an interrupt?". Claude appends bookkeeping records
+(`system`, `last-prompt`, `total_tokens_reminder`) within *milliseconds* of the interrupt,
+so the interrupt is almost never last. Verified by timestamping real interrupts in this
+project's own transcript — the record itself lands promptly, but is immediately buried.
+
+- [x] Scan the whole read tail for the newest interrupt (`ClaudeSessions.lastInterruptUuid`)
+      instead of testing only the final line
+- [x] Baseline on tab open: the first read of a session records its existing interrupts
+      without acting, so resuming a conversation full of old ones doesn't read as "Claude
+      just stopped". Only a change afterwards resets the icon
+- [x] **Poll** the transcript every 700 ms while the icon animates, instead of watching the
+      directory. An interrupt is only possible while Claude is busy, so the cost is one
+      tail read a second and only then; it also sidesteps the question of whether a
+      directory watch reports appends to a file another process holds open
+- [x] Test suite — 55 tests, no skips:
+      | Suite | Covers |
+      |---|---|
+      | `ClaudeStatusStateTest` | first tab owns the button, promotion on close, per-session interrupt baselines, when a balloon is due |
+      | `ClaudeSessionsTest` | path encoding, session lookup, interrupt parsing incl. the bug above |
+      | `ClaudeStatusHooksTest` | settings.json merge, upgrade from old entries, foreign hooks preserved, plus the reporter script executed through a real `sh` |
+      | `ClaudeStatusIconsTest` | frame naming and wrap-around, every frame file present, frames are white |
+      | `ClaudeLaunchTest` | launch commands always name a session id |
+      | `ClaudeStatusTest` | status words round-trip with what the script writes |
+
+> Testability drove three small refactors: `ClaudeStatusHooks` takes a directory rather than
+> a `Project`, the button's rules moved into a plain `ClaudeStatusState`, and launch
+> commands became a `ClaudeTerminalService.Launch` value. What remains untested is the raw
+> IDE wiring — creating terminal widgets, setting the tool-window icon — which needs a
+> running IDE rather than a unit test.
+
+### Phase 3.4 — The keystroke, not the transcript
+
+Ctrl+C during a turn still left the icon walking. Measuring the transcripts settled why —
+two independent faults, both found by counting real records rather than reasoning:
+
+| Measured | Consequence |
+|---|---|
+| A test session where Ctrl+C was pressed ends with a normal `stop_hook_summary` and **no interrupt record at all**. Of five genuine interrupts in this project's main transcript, the recent ones are all `…for tool use` | Interrupting a *tool call* is recorded; interrupting plain thinking often is not. The transcript cannot be the only signal |
+| Matching the bare phrase found **27** interrupts where **5** were real — the rest were the assistant's own tool calls grepping for it and test files containing it | The detector was firing on records that merely *mention* an interrupt |
+
+**There is no interrupt hook — measured, not assumed.** Each interrupt's nearest following
+`stop_hook_summary` is minutes later and belongs to the *next* turn (22:47:58 → 22:50:33;
+23:20:21 → 23:24:35), so `Stop` does not fire when a turn is cut short. The documented
+event list, down to `TeammateIdle` and `WorktreeCreate`, has nothing for interrupt or
+cancel either. The keystroke is the only immediate evidence there is.
+
+- [x] **Watch the keystroke.** The plugin owns the terminal, so Ctrl+C and Esc pressed in a
+      Claude tab put it back to idle at once. No hook, no transcript, no polling delay.
+      Optimistic by design: if Claude was in fact still working, its next
+      `Pre`/`PostToolUse` hook puts the animation back within moments.
+      Listens via `Toolkit.addAWTEventListener` rather than an `IdeEventQueue` dispatcher —
+      the lowest level the key can be seen at, before the IDE routes it — and accepts the
+      key either when it comes from inside the tab's component tree *or* while the Claude
+      tool window is the active one, since the terminal can host its editor outside that
+      tree
+- [x] **Gear menu → Diagnose Status Indicator.** The indicator spans a shell script, a file
+      watcher, a transcript and a key listener; when one goes quiet nothing is visible.
+      The action reports tracked tabs, the first tab's session, the status on disk, whether
+      hooks are installed, and when an interrupt key was last seen — turning "the icon is
+      wrong" into a named broken link
+- [x] **Anchor the marker to its field.** `"text":"[Request interrupted by user` — real
+      records carry it unescaped, records *about* one nest the quotes a level deeper
+      (`\"text\":\"…`). That single anchor is the difference between 27 matches and 5
+- [x] **Re-baseline when a busy stretch starts**, so the record Claude writes for an
+      interrupt the keyboard watcher already handled can't blank the icon during the *next*
+      turn
+- [x] 62 tests, no skips (`ClaudeInterruptKeysTest` plus regressions for both faults above)
+
+> Esc doubles as "interrupt" and as the terminal's focus-editor key; treating it as an
+> interrupt is deliberate, since denying a permission prompt is an Esc. The cost of a false
+> positive is a briefly still icon, which the next hook corrects.
 
 ### Phase 4 — MCP & polish
 - [ ] Auto-configure JetBrains MCP server for Claude

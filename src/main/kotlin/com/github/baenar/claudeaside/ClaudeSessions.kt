@@ -28,9 +28,17 @@ object ClaudeSessions {
     fun transcriptPath(userHome: String, projectPath: String, sessionId: String): Path =
         sessionsDir(userHome, projectPath).resolve("$sessionId$TRANSCRIPT_SUFFIX")
 
-    /** The last line of [text] that isn't blank, or null when there is none. */
-    fun lastNonBlankLine(text: String): String? =
-        text.lineSequence().lastOrNull { it.isNotBlank() }
+    /**
+     * The uuid of the newest interrupt record anywhere in [text], or null when it holds
+     * none.
+     *
+     * Deliberately not "is the *last* line an interrupt": Claude appends bookkeeping
+     * records (`system`, `last-prompt`, `total_tokens_reminder`, …) within milliseconds of
+     * the interrupt, so the interrupt is almost never the final line. Verified against real
+     * transcripts on this machine.
+     */
+    fun lastInterruptUuid(text: String): String? =
+        text.lineSequence().mapNotNull { interruptUuid(it) }.lastOrNull()
 
     /**
      * The entry uuid of [line] when it is Claude's "the user interrupted me" transcript
@@ -48,7 +56,16 @@ object ClaudeSessions {
         return ENTRY_UUID.find(line)?.groupValues?.get(1)
     }
 
-    private const val INTERRUPT_TEXT = "[Request interrupted by user"
+    /**
+     * The marker, anchored to the `text` field it appears in.
+     *
+     * The bare phrase is not enough: a transcript is full of records that merely *mention*
+     * it — tool calls that grep for it, files being written that contain it. Those nest the
+     * quotes one level deeper (`\"text\":\"[Request…`), so requiring the unescaped form
+     * tells a real interrupt from a record talking about one. Measured on this project's
+     * own transcript: the loose match found 27 "interrupts", 5 of which were real.
+     */
+    private const val INTERRUPT_TEXT = "\"text\":\"[Request interrupted by user"
     private val USER_TYPE = Regex("\"type\"\\s*:\\s*\"user\"")
     private val ENTRY_UUID = Regex("\"uuid\"\\s*:\\s*\"([^\"]+)\"")
 

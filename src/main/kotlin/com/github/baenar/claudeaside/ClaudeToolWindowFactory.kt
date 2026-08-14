@@ -26,7 +26,9 @@ class ClaudeToolWindowFactory : ToolWindowFactory {
                 RemoveClaudeTabAction(toolWindow),
             )
         )
-        toolWindow.setAdditionalGearActions(DefaultActionGroup(EnableStatusHooksAction(project)))
+        toolWindow.setAdditionalGearActions(
+            DefaultActionGroup(EnableStatusHooksAction(project), DiagnoseStatusAction(project))
+        )
 
         project.service<ClaudeStatusService>().ensureStarted()
         project.service<ClaudeTerminalService>().openContinuedSession(toolWindow)
@@ -35,7 +37,7 @@ class ClaudeToolWindowFactory : ToolWindowFactory {
 
     /** On first open, offers (with consent) to install the hooks that drive the status icon. */
     private fun offerStatusHooks(project: Project) {
-        val hooks = ClaudeStatusHooks(project)
+        val hooks = ClaudeStatusHooks.forProject(project) ?: return
         if (hooks.isInstalled()) return
 
         NotificationGroupManager.getInstance()

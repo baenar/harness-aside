@@ -22,26 +22,43 @@ object ClaudeStatusIcons {
     /** The plain glyph — also what `plugin.xml` registers as the tool window's icon. */
     val BASE: Icon by lazy { load("claudeAside") }
 
-    private val WALK: List<Icon> by lazy { frames("walk", 12) }
-    private val KICK: List<Icon> by lazy { frames("kick", 8) }
+    /** Frame counts must match what `tools/generate-icons.sh` writes. */
+    const val WALK_FRAMES = 12
+    const val KICK_FRAMES = 8
+
+    private val WALK: List<Icon> by lazy { frames(ClaudeStatus.THINKING, WALK_FRAMES) }
+    private val KICK: List<Icon> by lazy { frames(ClaudeStatus.WAITING, KICK_FRAMES) }
 
     /** True when [status] needs the animation timer running at all. */
-    fun isAnimated(status: ClaudeStatus?): Boolean = framesFor(status) != null
+    fun isAnimated(status: ClaudeStatus?): Boolean = frameCount(status) > 0
 
     /** The icon for [status] at animation step [frame] (any number; it wraps). */
-    fun forStatus(status: ClaudeStatus?, frame: Int): Icon {
-        val frames = framesFor(status) ?: return BASE
-        return frames[frame.mod(frames.size)]
+    fun forStatus(status: ClaudeStatus?, frame: Int): Icon = when (status) {
+        ClaudeStatus.THINKING -> WALK[frame.mod(WALK_FRAMES)]
+        ClaudeStatus.WAITING -> KICK[frame.mod(KICK_FRAMES)]
+        else -> BASE
     }
 
-    private fun framesFor(status: ClaudeStatus?): List<Icon>? = when (status) {
-        ClaudeStatus.THINKING -> WALK
-        ClaudeStatus.WAITING -> KICK
-        else -> null
+    /** How many frames [status] loops through; 0 when it is a still icon. */
+    fun frameCount(status: ClaudeStatus?): Int = when (status) {
+        ClaudeStatus.THINKING -> WALK_FRAMES
+        ClaudeStatus.WAITING -> KICK_FRAMES
+        else -> 0
     }
 
-    private fun frames(prefix: String, count: Int): List<Icon> =
-        (0 until count).map { load("%s_%02d".format(prefix, it)) }
+    /**
+     * Resource name of the icon for [status] at [frame], without directory or extension.
+     * Kept separate from loading so the file names can be checked without an IDE.
+     */
+    fun frameName(status: ClaudeStatus?, frame: Int): String {
+        val count = frameCount(status)
+        if (count == 0) return "claudeAside"
+        val prefix = if (status == ClaudeStatus.THINKING) "walk" else "kick"
+        return "%s_%02d".format(prefix, frame.mod(count))
+    }
+
+    private fun frames(status: ClaudeStatus, count: Int): List<Icon> =
+        (0 until count).map { load(frameName(status, it)) }
 
     private fun load(name: String): Icon =
         IconLoader.getIcon("/icons/$name.svg", ClaudeStatusIcons::class.java)
