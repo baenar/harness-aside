@@ -1,0 +1,96 @@
+# Publishes the installable plugin ZIP as a GitHub Release, so it is downloadable from the
+# repository's front page (the "Releases" box in the sidebar) without an Actions login.
+#
+# Workflow artifacts (build.yml) are deliberately kept as-is: they are per-commit, expire
+# after 90 days and require a logged-in GitHub account. Releases are permanent and public.
+#
+# Usage:  git tag v0.1.0 && git push origin v0.1.0
+# The tag is the source of truth for the version; gradle.properties only sets the default.
+
+name: Release
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and release, without the leading "v"'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      # Same intent as build.yml's free-disk-space step, done inline: the IntelliJ platform
+      # download is large and the hosted runner is tight. These three trees are the big wins
+      # and none of them is used by this build.
+      - name: Maximize Build Space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+
+      - name: Fetch Sources
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # The dispatch input arrives through the environment, never spliced into the script, and
+      # is checked before it reaches Gradle or a filename.
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            version="${INPUT_VERSION#v}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          case "$version" in
+            *[!0-9A-Za-z.-]* | '') echo "::error::bad version '$version'"; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "releasing $version"
+
+      # Tests gate the release: a tag should never ship something `check` rejects.
+      - name: Build plugin
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew check buildPlugin "-Pversion=$VERSION"
+
+      # A second, version-less copy so README can link to a URL that never changes:
+      # https://github.com/baenar/claude-aside/releases/latest/download/claude-aside.zip
+      - name: Prepare assets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cp "build/distributions/claude-aside-$VERSION.zip" "build/distributions/claude-aside.zip"
+          ls -l build/distributions
+
+      # `gh` is preinstalled on GitHub-hosted runners, so no third-party action is involved.
+      # --clobber lets a re-run of the same tag replace the assets instead of failing.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" \
+              "build/distributions/claude-aside-$VERSION.zip" \
+              "build/distributions/claude-aside.zip" --clobber
+          else
+            gh release create "v$VERSION" \
+              "build/distributions/claude-aside-$VERSION.zip" \
+              "build/distributions/claude-aside.zip" \
+              --title "v$VERSION" --generate-notes --target "$GITHUB_SHA"
+          fi
