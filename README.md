@@ -1,6 +1,9 @@
 # claude-aside
 
+[![Build](https://github.com/baenar/claude-aside/actions/workflows/build.yml/badge.svg)](https://github.com/baenar/claude-aside/actions/workflows/build.yml)
+
 Private IntelliJ/PyCharm plugin: Claude Code in its own terminal tool window, docked on the right.
+Almost entirely vibecoded - use at your own risk:))
 
 ## Install
 
@@ -8,6 +11,22 @@ Private IntelliJ/PyCharm plugin: Claude Code in its own terminal tool window, do
 — then <kbd>Settings</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk…</kbd>.
 
 All versions live under [Releases](https://github.com/baenar/claude-aside/releases).
+
+## Platform support
+
+*Confirmed* means exercised by hand end to end: the tab opens and resumes its session, the
+icon animates while Claude works, waiting-for-approval shows, and Ctrl+C returns it to the
+still glyph.
+
+| Platform | Status                                                                                                         |
+|---|----------------------------------------------------------------------------------------------------------------|
+| Windows | **Confirmed** — IDE and Claude both on the Windows side                                                        |
+| WSL | **Confirmed** — IDE on Windows, Claude inside the distro, project under `/home`                                |
+| Linux | **Untested** — no known blocker, and CI runs the test suite on Ubuntu, but the plugin has never been run there |
+| macOS | **Unverified** — prolly safe to run, not tested                                                                |
+
+IDEs: developed and run against IntelliJ IDEA Community. PyCharm should load it — the
+plugin depends only on the platform and the terminal — but that is untested too.
 
 ## Dev
 

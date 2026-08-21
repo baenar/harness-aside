@@ -172,9 +172,10 @@ prompt left it stuck on `waiting` because no hook fires on the *answer*.
       recorded as `[Request interrupted by user for tool use]`. Added `PermissionRequest` →
       `waiting` and `Post`/`PreToolUse` → `thinking` so an *approved* tool also recovers,
       which the `Notification`→`Stop` pair alone never did
-- [ ] Manual test: two tabs open side by side, each showing its own correct status;
-      Ctrl+C during a tool call returns to idle; answering "no" to a permission prompt
-      returns to idle
+- [x] Manual test — half of it superseded by Phase 3.2. "Two tabs each showing their own
+      status" stopped being something the plugin does once per-tab dots were dropped. The
+      surviving half — Ctrl+C during a tool call and a denied permission prompt both
+      return to idle — is what Phase 3.4 implements and tests
 
 > Upgrading needs one click: **⚙ → Reinstall Status Indicator Hooks**. Install now writes a
 > generated `.claude/aside-status.sh` (POSIX, `sed` not `jq`, so no extra dependency on
