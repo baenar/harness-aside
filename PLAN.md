@@ -181,11 +181,9 @@ prompt left it stuck on `waiting` because no hook fires on the *answer*.
 > macOS or Git-bash) and *replaces* entries from older plugin versions instead of appending
 > to them. The script is exercised by a unit test that runs it through a real `sh`.
 
-**Remaining limitation:** the transcript tail is read from
-`~/.claude/projects/<encoded>/`, resolved with the IDE's idea of `$HOME`. If the IDE runs
-on Windows while Claude runs under WSL, the two disagree and interrupt detection silently
-does nothing — hook-driven states still work. Same UNC/WSL path issue already tracked in
-Risks below.
+**Was a limitation, fixed in Phase 3.5:** the transcript tail is read from
+`~/.claude/projects/<encoded>/`, which under WSL is neither the IDE's `$HOME` nor the
+IDE's project path.
 
 ### Phase 3.2 — One animated icon instead of per-tab dots
 
@@ -299,6 +297,32 @@ cancel either. The keystroke is the only immediate evidence there is.
 > interrupt is deliberate, since denying a permission prompt is an Esc. The cost of a false
 > positive is a briefly still icon, which the next hook corrects.
 
+### Phase 3.5 — WSL projects
+
+The Risks table had flagged this as Phase 3 work, and Phase 3 shipped without it. Under WSL
+*two* things disagree, and translating one without the other still finds nothing:
+
+| The IDE says | Claude, inside the distro, uses |
+|---|---|
+| project `//wsl$/Debian/home/me/proj` | `/home/me/proj`, encoded `-home-me-proj` |
+| `$HOME` = `C:\Users\me` | the distro's `/home/me`, i.e. `//wsl$/Debian/home/me/.claude` |
+
+- [x] `ClaudeSessions.storage()` returns the pair Claude would use, and `sessionsDir` runs
+      everything through it — so `latestSessionId` and the transcript tail were both fixed
+      by one change. Handles the `wsl$` and `wsl.localhost` spellings, either slash, any casing
+- [x] Falls back to the IDE's own values when the home cannot be derived from the path
+      (anything outside `/home/<user>` and `/root`). Guessing a home would be worse than
+      today's "finds nothing"
+- [x] 9 tests; 71 total, no skips
+- [x] Confirmed against the real thing rather than reasoned about: `pwd` in a WSL tab reads
+      `/home/mbejnar/thesis`, and `\\wsl$\Debian\home\mbejnar\.claude\projects\`
+      holds `-home-mbejnar-thesis` with 5 transcripts — exactly the path this builds
+
+> What was *not* broken under WSL: the hook-driven states. `.claude/aside-status/` lives
+> inside the project, so it is reached over the UNC path like any other file. Only the two
+> features reading `~/.claude/projects` — resume-on-open and interrupt detection — were
+> silently dead.
+
 ### Phase 4 — MCP & polish
 - [ ] Auto-configure JetBrains MCP server for Claude
 - [ ] Focus shortcuts, settings page (claude binary path, default flags)
@@ -312,7 +336,7 @@ Each phase ships independently; stop whenever it's good enough.
 | Risk | Mitigation |
 |---|---|
 | Terminal APIs churn (Block/gen2 terminal rework ongoing; `AbstractTerminalRunner` may deprecate) | narrow in practice: `startShellTerminalWidget` is the *only* non-deprecated widget-creation path left on that class, i.e. the one JetBrains migrated to itself. Pin `sinceBuild=252`; revisit on IDE upgrade |
-| WSL: IDE-visible project path (`\\wsl$\...`) vs Linux path used in `~/.claude/projects` encoding | **not a Phase 1 problem** — nothing reads the session dir until Phase 3. `ClaudeSessions` must then normalize UNC → Linux path; a no-op if the IDE runs inside WSL |
+| WSL: IDE-visible project path (`\\wsl$\...`) vs Linux path used in `~/.claude/projects` encoding | **done in Phase 3.5** — `ClaudeSessions.storage` translates both the path and the home; a no-op if the IDE runs inside WSL. Residual: a distro project outside `/home/<user>` or `/root` still cannot be located |
 | `claude` not on PATH of the shell the IDE spawns | Phase 1: rely on shell rc files (login shell); Phase 4: settings field for binary path |
 | Hook-based state detection depends on Claude Code hook config format staying stable | keep the hook payload trivial (touch a file); feature degrades gracefully to "no status icons" |
 | Official Claude Code JetBrains plugin may add its own tool window later | ours is still the only one giving *terminal-in-right-dock*; re-evaluate overlap when it happens |
