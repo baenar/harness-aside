@@ -23,8 +23,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
-import java.nio.file.StandardWatchEventKinds
-import java.nio.file.WatchService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
@@ -40,7 +38,7 @@ import javax.swing.Timer
  * Two sources feed the state, because neither alone is complete:
  *
  * 1. **Hook state files** — `.claude/aside-status/<session-id>`, written by the hooks
- *    [ClaudeStatusHooks] installs, and watched here. These carry the normal lifecycle:
+ *    [ClaudeStatusHooks] installs, and polled here. These carry the normal lifecycle:
  *    idle → thinking → waiting → thinking → idle.
  * 2. **Transcript polling** — `~/.claude/projects/<encoded>/<session-id>.jsonl`. Claude
  *    fires no hook when a turn is cut short by Ctrl+C or by denying a permission prompt,
@@ -54,8 +52,20 @@ class ClaudeStatusService(private val project: Project) : Disposable {
 
     private val state = ClaudeStatusState()
 
+    /** Background poll of the hook state files; see [startStatusPolling]. */
+    private var statusPoll: ScheduledFuture<*>? = null
+
+    /**
+     * What the previous scan saw in each state file: its mtime and its contents.
+     *
+     * The poll must only report *changes*, which is what `WatchService` used to give for
+     * free. Re-applying an unchanged file is not harmless: Claude fires no hook on Ctrl+C,
+     * so after an interrupt the file still reads `thinking` while the button is correctly
+     * idle, and re-applying it would put the animation straight back.
+     */
     @Volatile
-    private var statusWatch: WatchService? = null
+    private var seenStatusFiles: Map<String, Pair<Long, String>> = emptyMap()
+
     private var started = false
 
     /** EDT-only animation state. */
@@ -73,7 +83,7 @@ class ClaudeStatusService(private val project: Project) : Disposable {
     /**
      * A human-readable dump of everything the indicator depends on.
      *
-     * The status pipeline spans a shell script, a file watcher, a transcript and a key
+     * The status pipeline spans a shell script, a polled directory, a transcript and a key
      * listener, and when it goes quiet none of that is visible. This is what the gear
      * menu's *Diagnose Status Indicator* shows.
      */
@@ -101,8 +111,9 @@ class ClaudeStatusService(private val project: Project) : Disposable {
         if (started) return
         started = true
         val base = project.basePath ?: return
-        watchStatusFiles(base)
-        rescanStatusFiles(base)
+        prepareStatusDir(base)
+        scanStatusFiles(base)
+        startStatusPolling(base)
         refreshIcon()
     }
 
@@ -167,52 +178,68 @@ class ClaudeStatusService(private val project: Project) : Disposable {
     private fun statusDir(base: String): Path =
         Paths.get(base, ClaudeStatusHooks.CLAUDE_DIR, ClaudeStatusHooks.STATUS_DIR)
 
-    private fun watchStatusFiles(base: String) {
+    /** Makes sure the directory the hooks write into exists before anything reads it. */
+    private fun prepareStatusDir(base: String) {
         val dir = statusDir(base)
         try {
             // Pre-3.1 installs left a plain file where the status directory now lives.
             if (Files.isRegularFile(dir)) Files.delete(dir)
             Files.createDirectories(dir)
-            val ws = dir.fileSystem.newWatchService()
-            dir.register(
-                ws,
-                StandardWatchEventKinds.ENTRY_CREATE,
-                StandardWatchEventKinds.ENTRY_MODIFY,
-                StandardWatchEventKinds.ENTRY_DELETE,
-            )
-            statusWatch = ws
-            ApplicationManager.getApplication().executeOnPooledThread { watchLoop(ws, base) }
         } catch (e: Exception) {
-            LOG.warn("Claude Aside: cannot watch $dir for status changes", e)
+            LOG.warn("Claude Aside: cannot prepare $dir", e)
         }
     }
 
-    private fun watchLoop(ws: WatchService, base: String) {
-        while (!project.isDisposed) {
-            val key = try {
-                ws.take()
-            } catch (_: Exception) {
-                return // watch service closed on dispose
-            }
-            key.pollEvents()
-                .mapNotNull { it.context()?.toString() }
-                .distinct()
-                .forEach { onStatusFileChanged(base, it) }
-            if (!key.reset()) return
-        }
+    /**
+     * Polls the state files instead of watching them.
+     *
+     * NIO's `WatchService` was the obvious choice and is the wrong one here. On Windows it
+     * is backed by `ReadDirectoryChangesW`, which reports nothing for a project opened over
+     * `\\wsl$\...` - that share is the distro's 9P filesystem, not a local volume.
+     * The watch registered without error and then stayed silent forever, so the hooks
+     * wrote `thinking` while the button went on showing `idle`.
+     *
+     * Polling is a listing and a short read twice a second, over a directory holding one
+     * file per open tab. Cheap enough everywhere, and it is one code path rather than one
+     * per filesystem.
+     */
+    private fun startStatusPolling(base: String) {
+        statusPoll = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
+            {
+                if (!project.isDisposed) runCatching { scanStatusFiles(base) }
+            },
+            STATUS_POLL_MS, STATUS_POLL_MS, TimeUnit.MILLISECONDS,
+        )
     }
 
-    /** Picks up state files written before the IDE started watching. */
-    private fun rescanStatusFiles(base: String) {
+    /** Applies every state file, and clears the sessions whose file has gone. */
+    private fun scanStatusFiles(base: String) {
         val dir = statusDir(base)
-        if (!Files.isDirectory(dir)) return
-        try {
-            Files.list(dir).use { stream ->
-                stream.forEach { onStatusFileChanged(base, it.fileName.toString()) }
-            }
+        val names = try {
+            if (!Files.isDirectory(dir)) emptySet()
+            else Files.list(dir).use { stream -> stream.map { it.fileName.toString() }.toList().toSet() }
         } catch (e: Exception) {
             LOG.warn("Claude Aside: cannot read $dir", e)
+            return
         }
+
+        val current = HashMap<String, Pair<Long, String>>(names.size)
+        for (name in names) {
+            // mtime as well as contents: a new turn rewrites the same word `thinking`, and
+            // that rewrite has to count as a change even though nothing in the file did.
+            val file = dir.resolve(name)
+            val stamp = try {
+                Files.getLastModifiedTime(file).toMillis() to Files.readString(file)
+            } catch (_: Exception) {
+                continue // mid-write, or gone since the listing; the next poll settles it
+            }
+            current[name] = stamp
+            if (seenStatusFiles[name] != stamp) onStatusFileChanged(base, name)
+        }
+
+        // A file disappears when the session ends; the same handler clears it.
+        (seenStatusFiles.keys - current.keys).forEach { onStatusFileChanged(base, it) }
+        seenStatusFiles = current
     }
 
     private fun onStatusFileChanged(base: String, sessionId: String) {
@@ -365,8 +392,8 @@ class ClaudeStatusService(private val project: Project) : Disposable {
         animator = null
         interruptPoll?.cancel(false)
         interruptPoll = null
-        statusWatch?.let { runCatching { it.close() } }
-        statusWatch = null
+        statusPoll?.cancel(false)
+        statusPoll = null
     }
 
     companion object {
@@ -375,6 +402,9 @@ class ClaudeStatusService(private val project: Project) : Disposable {
 
         /** Enough to hold the last transcript records; they are single lines of JSON. */
         private const val TAIL_BYTES = 64L * 1024
+
+        /** How often the hook state files are re-read. Fast enough to feel immediate. */
+        private const val STATUS_POLL_MS = 500L
 
         /** ~14 fps: smooth enough for a 13px glyph, cheap enough to leave running. */
         private const val FRAME_MS = 70

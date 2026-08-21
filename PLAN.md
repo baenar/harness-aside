@@ -323,6 +323,36 @@ The Risks table had flagged this as Phase 3 work, and Phase 3 shipped without it
 > features reading `~/.claude/projects` — resume-on-open and interrupt detection — were
 > silently dead.
 
+### Phase 3.6 — Watching a filesystem that never reports
+
+With the paths fixed, WSL still showed a still icon while the hooks were writing
+`thinking`. *Diagnose Status Indicator* named the broken link in one line: `Status file:
+thinking` next to `Status the button shows: idle`. The file was right, the notification was
+missing.
+
+| Measured | Consequence |
+|---|---|
+| NIO `WatchService` registers without error on `\\wsl$\...` and then never fires | On Windows it is backed by `ReadDirectoryChangesW`, which reports nothing for the distro's 9P share. The status was applied once, at startup, and never again |
+
+- [x] **Poll instead of watch**, every 500 ms. One code path for every filesystem, at the
+      cost of a listing and a short read twice a second over a directory holding one file
+      per open tab
+- [x] **Report changes, not contents.** The first polling version re-applied whatever the
+      file said on every tick, which broke Ctrl+C outright: no hook fires on an interrupt,
+      so the file still reads `thinking` while the button is correctly idle, and half a
+      second later the poll put the animation straight back. The scan now remembers each
+      file's mtime *and* contents — mtime too, because a new turn rewrites the same word
+      `thinking` and that rewrite has to count as a change
+- [x] Deletions are found by diffing against the previous scan, which `ENTRY_DELETE` used
+      to cover
+- [x] Confirmed by hand on both a Windows project and a WSL one: animation runs, waiting
+      for approval shows, Ctrl+C returns to the still glyph
+
+> Not covered: after an interrupt the state file keeps saying `thinking` until Claude's
+> next hook. Restarting the IDE in that window starts the animation against an idle Claude.
+> Writing `idle` from the key listener would close it, at the price of the keyboard handler
+> writing into project files.
+
 ### Phase 4 — MCP & polish
 - [ ] Auto-configure JetBrains MCP server for Claude
 - [ ] Focus shortcuts, settings page (claude binary path, default flags)
