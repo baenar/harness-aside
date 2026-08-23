@@ -354,6 +354,54 @@ missing.
 > Writing `idle` from the key listener would close it, at the price of the keyboard handler
 > writing into project files.
 
+### Phase 3.7 — The IDE froze, and it was not our code
+
+PyCharm went sluggish. `PerformanceWatcher` had already written the evidence: **97 UI
+freezes totalling 621 s in one 4h20 session**, average 6.4 s. The plugin appears in the
+coroutine-scope registry of 99 of those 100 thread dumps and in the actual stack of none.
+
+The dumps all have one shape — a three-way lock cycle inside the classic terminal:
+
+| Thread | Holds | Waits for |
+|---|---|---|
+| `TerminalEmulator-Local` | the `TerminalTextBuffer` lock | the IDE's hyperlink filters, via a blocking `CompletableFuture.get()` in `TextProcessing.applyFilter` |
+| `JediTerminal Filters` | — | that same buffer lock, via `TextProcessing$LineInfoImpl.getLine` |
+| EDT | — | that same buffer lock, painting `TerminalPanel` |
+
+Nothing breaks the cycle but the emulator's own timeout, which is why 81 of 100 freezes
+lasted exactly 6 s. The frame above `applyFilter` was `JediTerminal.setLinkUriStarted` in
+**99 of 99** dumps: every single one was triggered by an OSC 8 hyperlink in Claude's output.
+
+- [x] **`FORCE_HYPERLINK=0`** in the tab's environment. Claude honours it — the bundled
+      `supportsHyperlink` reads `!(r.length > 0 && parseInt(r, 10) === 0)` — and without
+      OSC 8 the jediterm path is never entered. The cost is that URLs in Claude's output
+      print as plain text
+- [x] **`WSLENV=…:FORCE_HYPERLINK/u`** alongside it: with the IDE on Windows and Claude in
+      a distro the variable is set on `wsl.exe`, and only names listed there cross over.
+      Verified by hand through `wsl.exe -e sh -c 'printf %s "$FORCE_HYPERLINK"'`. Whatever
+      the user already forwarded is kept, and the platform appends its own names to ours
+      rather than overwriting
+
+Measured while here, and trimmed in the same pass:
+
+- [x] The status poll ran every 500 ms for the life of the project **even with no tab open**
+      — 0.2 ms a scan locally but 6.2 ms over `\\wsl$`. It now skips when nothing is tracked
+- [x] The interrupt poll re-read a 64 KB transcript tail every 700 ms while animating, 14 ms
+      each over `\\wsl$`, plus the garbage. It now stats size and mtime first and skips the
+      read when the file has not moved — which is exactly the case while Claude sits on an
+      approval prompt, the longest stretch of animation there is
+- [x] Animation dropped from 70 ms to 100 ms per frame. Every frame is EDT work: `setIcon`
+      repaints the stripe button and refreshes the activate action's presentation
+- [x] `RestartClaudeTabAction` and `RemoveClaudeTabAction` moved to `ActionUpdateThread.BGT`.
+      Their `update` reads one `contentCount`, and the log showed `1603 ms to grab EDT for
+      RemoveClaudeTabAction#presentation` — a symptom of the freezes, but no reason to be
+      queued behind them
+
+> The real fix is the Reworked terminal engine, which has no `TextProcessing` at all. The
+> plugin hardcodes `LocalTerminalDirectRunner`, i.e. **classic**, so changing Terminal
+> Engine in Settings does not reach our tab. Moving over means the `terminalWidgetProvider`
+> EP plus internal session wiring — deliberately left for a separate decision.
+
 ### Phase 4 — MCP & polish
 - [ ] Auto-configure JetBrains MCP server for Claude
 - [ ] Focus shortcuts, settings page (claude binary path, default flags)

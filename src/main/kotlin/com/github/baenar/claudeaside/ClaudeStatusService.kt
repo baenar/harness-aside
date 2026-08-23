@@ -23,6 +23,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
@@ -170,6 +171,7 @@ class ClaudeStatusService(private val project: Project) : Disposable {
     /** Forgets a closed tab; the next-oldest tab takes over the icon. */
     fun unregisterTab(sessionId: String) {
         state.closeTab(sessionId)
+        seenTranscripts.remove(sessionId)
         refreshIcon()
     }
 
@@ -206,7 +208,10 @@ class ClaudeStatusService(private val project: Project) : Disposable {
     private fun startStatusPolling(base: String) {
         statusPoll = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
             {
-                if (!project.isDisposed) runCatching { scanStatusFiles(base) }
+                // With no tab there is nothing the icon could show, so skip the listing
+                // rather than repeat it for the life of the project: a scan measures
+                // ~0.2ms locally but ~6ms over `\\wsl$`.
+                if (!project.isDisposed && state.openTabCount() > 0) runCatching { scanStatusFiles(base) }
             },
             STATUS_POLL_MS, STATUS_POLL_MS, TimeUnit.MILLISECONDS,
         )
@@ -259,11 +264,31 @@ class ClaudeStatusService(private val project: Project) : Disposable {
 
     // ------------------------------------------------------------------- interrupts
 
+    /**
+     * Per session: the transcript's size and mtime when it was last read, and the interrupt
+     * uuid found then.
+     *
+     * A transcript that has not moved cannot hold a new interrupt, and the longest stretch
+     * of animation — Claude sitting on an approval prompt — is exactly when it does not
+     * move. Two stat calls are much cheaper than the 64KB tail read they replace, which
+     * measures ~14ms over `\\wsl$`.
+     */
+    private val seenTranscripts = ConcurrentHashMap<String, Pair<Pair<Long, Long>, String?>>()
+
     /** The newest interrupt record in [sessionId]'s transcript, or null. */
     private fun latestInterrupt(sessionId: String): String? {
         val base = project.basePath ?: return null
         val path = ClaudeSessions.transcriptPath(System.getProperty("user.home"), base, sessionId)
-        return readTail(path)?.let { ClaudeSessions.lastInterruptUuid(it) }
+        val stamp = try {
+            Files.size(path) to Files.getLastModifiedTime(path).toMillis()
+        } catch (_: Exception) {
+            return null // transcript missing or being rotated
+        }
+        seenTranscripts[sessionId]?.let { (seen, uuid) -> if (seen == stamp) return uuid }
+
+        val uuid = readTail(path)?.let { ClaudeSessions.lastInterruptUuid(it) }
+        seenTranscripts[sessionId] = stamp to uuid
+        return uuid
     }
 
     /**
@@ -406,8 +431,12 @@ class ClaudeStatusService(private val project: Project) : Disposable {
         /** How often the hook state files are re-read. Fast enough to feel immediate. */
         private const val STATUS_POLL_MS = 500L
 
-        /** ~14 fps: smooth enough for a 13px glyph, cheap enough to leave running. */
-        private const val FRAME_MS = 70
+        /**
+         * 10 fps: smooth enough for a 13px glyph, and every frame is EDT work — `setIcon`
+         * repaints the stripe button and refreshes the activate action's presentation —
+         * running for as long as Claude is busy.
+         */
+        private const val FRAME_MS = 100
 
         /** How often to look for an interrupt while Claude is busy. */
         private const val POLL_MS = 700L

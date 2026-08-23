@@ -46,6 +46,25 @@ class ClaudeLaunchTest {
     }
 
     @Test
+    fun `tabs run with Claude's OSC 8 hyperlinks turned off`() {
+        // Not cosmetic: an OSC 8 sequence deadlocks the classic terminal against the EDT.
+        assertEquals("0", ClaudeTerminalService.claudeEnv(null)["FORCE_HYPERLINK"])
+    }
+
+    @Test
+    fun `the switch is forwarded into a WSL distro`() {
+        assertEquals("FORCE_HYPERLINK/u", ClaudeTerminalService.claudeEnv(null)["WSLENV"])
+        assertEquals("FORCE_HYPERLINK/u", ClaudeTerminalService.claudeEnv("")["WSLENV"])
+    }
+
+    @Test
+    fun `forwarding keeps whatever the user already forwarded`() {
+        assertEquals("MY_VAR/p:FORCE_HYPERLINK/u", ClaudeTerminalService.claudeEnv("MY_VAR/p")["WSLENV"])
+        // A trailing separator is legal in WSLENV; appending after it would leave an empty entry.
+        assertEquals("MY_VAR/p:FORCE_HYPERLINK/u", ClaudeTerminalService.claudeEnv("MY_VAR/p:")["WSLENV"])
+    }
+
+    @Test
     fun `never falls back to a command that hides the session id`() {
         val commands = listOf(
             ClaudeTerminalService.Launch.new().command,
