@@ -39,7 +39,7 @@ class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
         e.presentation.isEnabled = toolWindow.contentManager.contentCount > 0
     }
 
-    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 }
 
 /** Title-bar action: close the current tab, terminating its terminal (pty). */
@@ -56,7 +56,7 @@ class RemoveClaudeTabAction(private val toolWindow: ToolWindow) :
         e.presentation.isEnabled = toolWindow.contentManager.contentCount > 0
     }
 
-    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 }
 
 /**
