@@ -59,6 +59,7 @@ class ClaudeTerminalService(private val project: Project) {
     fun openTab(toolWindow: ToolWindow, command: String, sessionId: String? = null, title: String? = null) {
         val options = ShellStartupOptions.Builder()
             .workingDirectory(project.basePath)
+            .envVariables(claudeEnv(System.getenv("WSLENV")))
             .build()
 
         val widget = LocalTerminalDirectRunner.createTerminalRunner(project)
@@ -130,6 +131,32 @@ class ClaudeTerminalService(private val project: Project) {
     companion object {
         private val WIDGET_KEY = Key.create<TerminalWidget>("claude.aside.terminalWidget")
         private val SESSION_KEY = Key.create<String>("claude.aside.sessionId")
+
+        /** Name and forwarding flag of the variable that turns Claude's OSC 8 links off. */
+        private const val FORWARDED = "FORCE_HYPERLINK/u"
+
+        /**
+         * Environment overrides for a tab's shell. The platform merges these over the
+         * inherited environment, so this map is additions, not a replacement.
+         *
+         * `FORCE_HYPERLINK=0` stops Claude emitting OSC 8 hyperlinks. They deadlock the
+         * classic terminal: jediterm parses the sequence holding the text-buffer lock and
+         * then waits on the IDE's hyperlink filters, which want that same lock, while the
+         * EDT waits behind both to paint. It unwinds only on jediterm's own timeout, so
+         * every hyperlink cost a ~6s freeze.
+         *
+         * WSL is a second hop — the variable is set on `wsl.exe`, and only names listed in
+         * [inheritedWslEnv] cross into the distro — so ours is appended to whatever the
+         * user already had. The platform in turn appends its own names to this, rather
+         * than overwriting it.
+         */
+        fun claudeEnv(inheritedWslEnv: String?): Map<String, String> {
+            val inherited = inheritedWslEnv?.removeSuffix(":").orEmpty()
+            return mapOf(
+                "FORCE_HYPERLINK" to "0",
+                "WSLENV" to if (inherited.isEmpty()) FORWARDED else "$inherited:$FORWARDED",
+            )
+        }
 
         /** The Claude session running in [content], when the plugin launched it with a known id. */
         fun sessionIdOf(content: Content?): String? = content?.getUserData(SESSION_KEY)
