@@ -12,7 +12,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="Harness Aside"
                     anchor="right"
-                    icon="/icons/harnessAside.svg"
+                    icon="/icons/manul-default.svg"
                     factoryClass="com.github.baenar.harnessaside.HarnessToolWindowFactory"/>
         <notificationGroup id="Harness Aside" displayType="BALLOON"/>
     </extensions>

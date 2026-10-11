@@ -108,12 +108,7 @@ class HarnessStatusManager(private val project: Project) : Disposable {
 
         val animated = ClaudeStatusIcons.isAnimatedHarness(currentStatus)
         if (!animated) {
-            val icon = if (currentStatus == HarnessStatus.WAITING) {
-                ClaudeStatusIcons.forHarnessStatus(HarnessStatus.WAITING, 0)
-            } else {
-                ClaudeStatusIcons.BASE
-            }
-            toolWindow.setIcon(icon)
+            toolWindow.setIcon(ClaudeStatusIcons.forHarnessStatus(currentStatus, 0))
             return
         }
 
@@ -169,7 +164,7 @@ class HarnessStatusManager(private val project: Project) : Disposable {
     companion object {
         private val LOG = logger<HarnessStatusManager>()
         const val NOTIFICATION_GROUP = "Harness Aside"
-        private const val FRAME_MS = 100
+        private const val FRAME_MS = 140
 
         fun getInstance(project: Project): HarnessStatusManager = project.service()
     }
