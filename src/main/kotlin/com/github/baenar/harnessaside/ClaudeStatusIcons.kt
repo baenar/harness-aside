@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import com.intellij.openapi.util.IconLoader
 import javax.swing.Icon
@@ -20,7 +20,7 @@ import javax.swing.Icon
 object ClaudeStatusIcons {
 
     /** The plain glyph — also what `plugin.xml` registers as the tool window's icon. */
-    val BASE: Icon by lazy { load("claudeAside") }
+    val BASE: Icon by lazy { load("harnessAside") }
 
     /** Frame counts must match what `tools/generate-icons.sh` writes. */
     const val WALK_FRAMES = 12
@@ -52,7 +52,7 @@ object ClaudeStatusIcons {
      */
     fun frameName(status: ClaudeStatus?, frame: Int): String {
         val count = frameCount(status)
-        if (count == 0) return "claudeAside"
+        if (count == 0) return "harnessAside"
         val prefix = if (status == ClaudeStatus.THINKING) "walk" else "kick"
         return "%s_%02d".format(prefix, frame.mod(count))
     }

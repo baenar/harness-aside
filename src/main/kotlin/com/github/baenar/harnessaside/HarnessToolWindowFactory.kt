@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
@@ -16,7 +16,7 @@ import com.intellij.openapi.wm.ToolWindowFactory
  * there is none. Tab management and the launch itself live in [ClaudeTerminalService];
  * the status indicator in [ClaudeStatusService].
  */
-class ClaudeToolWindowFactory : ToolWindowFactory {
+class HarnessToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         toolWindow.setTitleActions(

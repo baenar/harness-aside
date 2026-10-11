@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -423,7 +423,7 @@ class ClaudeStatusService(private val project: Project) : Disposable {
 
     companion object {
         private val LOG = logger<ClaudeStatusService>()
-        const val NOTIFICATION_GROUP = "Claude Aside"
+        const val NOTIFICATION_GROUP = "Harness Aside"
 
         /** Enough to hold the last transcript records; they are single lines of JSON. */
         private const val TAIL_BYTES = 64L * 1024

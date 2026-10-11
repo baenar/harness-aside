@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent

@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser

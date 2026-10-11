@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -11,7 +11,7 @@ import kotlin.io.path.name
  * Claude keeps one JSONL file per session under
  * `~/.claude/projects/<encoded-project-path>/<session-id>.jsonl`, where the project path
  * is encoded by replacing every non-alphanumeric character with `-` (so `/`, `.` and `_`
- * all become `-`). Verified: `D:\claude-aside` → `D--claude-aside`.
+ * all become `-`). Verified: `D:\harness-aside` → `D--harness-aside`.
  */
 object ClaudeSessions {
 

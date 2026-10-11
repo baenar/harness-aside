@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,8 +26,8 @@ class ClaudeStatusIconsTest {
 
     @Test
     fun `still states always use the plain glyph`() {
-        assertEquals("claudeAside", ClaudeStatusIcons.frameName(ClaudeStatus.IDLE, 0))
-        assertEquals("claudeAside", ClaudeStatusIcons.frameName(null, 7))
+        assertEquals("harnessAside", ClaudeStatusIcons.frameName(ClaudeStatus.IDLE, 0))
+        assertEquals("harnessAside", ClaudeStatusIcons.frameName(null, 7))
         assertEquals(0, ClaudeStatusIcons.frameCount(ClaudeStatus.IDLE))
     }
 

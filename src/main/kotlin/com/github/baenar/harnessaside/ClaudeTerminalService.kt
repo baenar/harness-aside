@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -13,7 +13,7 @@ import org.jetbrains.plugins.terminal.LocalTerminalDirectRunner
 import org.jetbrains.plugins.terminal.ShellStartupOptions
 import java.util.UUID
 
-const val TOOL_WINDOW_ID = "Claude Aside"
+const val TOOL_WINDOW_ID = "Harness Aside"
 
 /**
  * Owns the Claude terminal tabs inside the right-docked tool window.

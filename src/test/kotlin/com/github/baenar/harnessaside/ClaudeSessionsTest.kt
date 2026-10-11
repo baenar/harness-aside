@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -17,8 +17,8 @@ class ClaudeSessionsTest {
 
     @Test
     fun `encodes a Windows path the way Claude does`() {
-        // Verified against this machine: D:\claude-aside -> D--claude-aside
-        assertEquals("D--claude-aside", ClaudeSessions.encodeProjectPath("D:\\claude-aside"))
+        // Verified against this machine: D:\harness-aside -> D--harness-aside
+        assertEquals("D--harness-aside", ClaudeSessions.encodeProjectPath("D:\\harness-aside"))
     }
 
     @Test

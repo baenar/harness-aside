@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 /**
  * Which Claude session the tool-window button follows, and what it is doing.

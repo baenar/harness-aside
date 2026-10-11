@@ -1,4 +1,4 @@
-package com.github.baenar.claudeaside
+package com.github.baenar.harnessaside
 
 /**
  * Claude's current state, as reported by the hooks installed by [ClaudeStatusHooks].

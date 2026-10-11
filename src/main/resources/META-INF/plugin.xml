@@ -1,27 +1,27 @@
 <idea-plugin>
-    <id>com.github.baenar.claudeaside</id>
-    <name>Claude Aside</name>
+    <id>com.github.baenar.harnessaside</id>
+    <name>Harness Aside</name>
     <vendor>baenar</vendor>
     <description><![CDATA[
-        Runs Claude Code in a dedicated terminal tool window, docked on the right.
+        Runs AI coding harnesses (Claude Code, Antigravity CLI, OpenCode) in a dedicated terminal tool window, docked on the right.
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="Claude Aside"
+        <toolWindow id="Harness Aside"
                     anchor="right"
-                    icon="/icons/claudeAside.svg"
-                    factoryClass="com.github.baenar.claudeaside.ClaudeToolWindowFactory"/>
-        <notificationGroup id="Claude Aside" displayType="BALLOON"/>
+                    icon="/icons/harnessAside.svg"
+                    factoryClass="com.github.baenar.harnessaside.HarnessToolWindowFactory"/>
+        <notificationGroup id="Harness Aside" displayType="BALLOON"/>
     </extensions>
 
     <actions>
-        <action id="ClaudeAside.SendSelection"
-                class="com.github.baenar.claudeaside.SendSelectionToClaudeAction"
-                text="Send to Claude Aside"
-                description="Insert a reference to this file and selection into the active Claude terminal">
+        <action id="HarnessAside.SendSelection"
+                class="com.github.baenar.harnessaside.SendSelectionToClaudeAction"
+                text="Send to Harness Aside"
+                description="Insert a reference to this file and selection into the active harness terminal">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
