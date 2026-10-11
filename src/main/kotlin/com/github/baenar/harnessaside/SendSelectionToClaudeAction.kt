@@ -1,5 +1,7 @@
 package com.github.baenar.harnessaside
 
+import com.github.baenar.harnessaside.core.HarnessTerminalService
+import com.github.baenar.harnessaside.core.TOOL_WINDOW_ID
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -12,9 +14,9 @@ import com.intellij.openapi.wm.ToolWindowManager
 
 /**
  * Editor action: inserts a reference to the current file (and selected line range) into
- * the active Claude terminal as `@path/to/file#Lx-Ly`, without submitting it.
+ * the active harness terminal as `@path/to/file#Lx-Ly`, without submitting it.
  */
-class SendSelectionToClaudeAction : AnAction() {
+open class SendSelectionToHarnessAction : AnAction() {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -25,7 +27,7 @@ class SendSelectionToClaudeAction : AnAction() {
         val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return
 
         // activate() creates the first tab (via the factory) if none exists yet, then sends.
-        toolWindow.activate { project.service<ClaudeTerminalService>().sendText(toolWindow, "$reference ") }
+        toolWindow.activate { project.service<HarnessTerminalService>().sendText(toolWindow, "$reference ") }
     }
 
     override fun update(e: AnActionEvent) {
@@ -53,3 +55,7 @@ class SendSelectionToClaudeAction : AnAction() {
         return if (base != null && path.startsWith(base)) path.substring(base.length).trimStart('/') else file.name
     }
 }
+
+/** Legacy alias retained for plugin.xml backward compatibility. */
+class SendSelectionToClaudeAction : SendSelectionToHarnessAction()
+

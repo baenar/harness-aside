@@ -1,4 +1,4 @@
-package com.github.baenar.harnessaside
+package com.github.baenar.harnessaside.claude
 
 import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationGroupManager

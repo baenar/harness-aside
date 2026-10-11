@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" idle"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" thinking"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=thinking&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" thinking"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=tool&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -35,7 +35,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" thinking"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=thinking&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -45,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" waiting"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=waiting&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -55,7 +65,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" waiting"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=waiting&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -65,7 +85,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" idle"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -75,7 +105,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/aside-status.sh\" end"
+            "command": "curl -s -X POST \"http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle&token=$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
           }
         ]
       }

@@ -1,4 +1,4 @@
-package com.github.baenar.harnessaside
+package com.github.baenar.harnessaside.claude
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

@@ -1,5 +1,6 @@
-package com.github.baenar.harnessaside
+package com.github.baenar.harnessaside.claude
 
+import com.github.baenar.harnessaside.core.TOOL_WINDOW_ID
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -12,8 +13,6 @@ import com.intellij.ui.content.ContentFactory
 import org.jetbrains.plugins.terminal.LocalTerminalDirectRunner
 import org.jetbrains.plugins.terminal.ShellStartupOptions
 import java.util.UUID
-
-const val TOOL_WINDOW_ID = "Harness Aside"
 
 /**
  * Owns the Claude terminal tabs inside the right-docked tool window.
@@ -57,9 +56,10 @@ class ClaudeTerminalService(private val project: Project) {
      * @param title tab title; when null a sensible "Claude"/"Claude N" name is derived.
      */
     fun openTab(toolWindow: ToolWindow, command: String, sessionId: String? = null, title: String? = null) {
+        val env = project.service<com.github.baenar.harnessaside.core.HarnessTerminalService>().harnessEnv()
         val options = ShellStartupOptions.Builder()
             .workingDirectory(project.basePath)
-            .envVariables(claudeEnv(System.getenv("WSLENV")))
+            .envVariables(env)
             .build()
 
         val widget = LocalTerminalDirectRunner.createTerminalRunner(project)

@@ -1,4 +1,4 @@
-package com.github.baenar.harnessaside
+package com.github.baenar.harnessaside.claude
 
 import java.nio.file.Files
 import java.nio.file.Path

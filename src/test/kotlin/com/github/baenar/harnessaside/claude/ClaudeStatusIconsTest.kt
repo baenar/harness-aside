@@ -1,4 +1,4 @@
-package com.github.baenar.harnessaside
+package com.github.baenar.harnessaside.claude
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,6 +22,15 @@ class ClaudeStatusIconsTest {
         assertTrue(ClaudeStatusIcons.isAnimated(ClaudeStatus.WAITING))
         assertFalse(ClaudeStatusIcons.isAnimated(ClaudeStatus.IDLE))
         assertFalse("no status yet is a still icon too", ClaudeStatusIcons.isAnimated(null))
+    }
+
+    @Test
+    fun `harness busy states animate`() {
+        assertTrue(ClaudeStatusIcons.isAnimatedHarness(com.github.baenar.harnessaside.core.HarnessStatus.THINKING))
+        assertTrue(ClaudeStatusIcons.isAnimatedHarness(com.github.baenar.harnessaside.core.HarnessStatus.EXECUTING_TOOL))
+        assertTrue(ClaudeStatusIcons.isAnimatedHarness(com.github.baenar.harnessaside.core.HarnessStatus.WAITING))
+        assertFalse(ClaudeStatusIcons.isAnimatedHarness(com.github.baenar.harnessaside.core.HarnessStatus.IDLE))
+        assertFalse(ClaudeStatusIcons.isAnimatedHarness(null))
     }
 
     @Test

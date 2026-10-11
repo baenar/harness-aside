@@ -1,4 +1,4 @@
-package com.github.baenar.harnessaside
+package com.github.baenar.harnessaside.claude
 
 import com.intellij.openapi.util.IconLoader
 import javax.swing.Icon
@@ -32,10 +32,22 @@ object ClaudeStatusIcons {
     /** True when [status] needs the animation timer running at all. */
     fun isAnimated(status: ClaudeStatus?): Boolean = frameCount(status) > 0
 
+    fun isAnimatedHarness(status: com.github.baenar.harnessaside.core.HarnessStatus?): Boolean =
+        status == com.github.baenar.harnessaside.core.HarnessStatus.THINKING ||
+            status == com.github.baenar.harnessaside.core.HarnessStatus.EXECUTING_TOOL ||
+            status == com.github.baenar.harnessaside.core.HarnessStatus.WAITING
+
     /** The icon for [status] at animation step [frame] (any number; it wraps). */
     fun forStatus(status: ClaudeStatus?, frame: Int): Icon = when (status) {
         ClaudeStatus.THINKING -> WALK[frame.mod(WALK_FRAMES)]
         ClaudeStatus.WAITING -> KICK[frame.mod(KICK_FRAMES)]
+        else -> BASE
+    }
+
+    fun forHarnessStatus(status: com.github.baenar.harnessaside.core.HarnessStatus?, frame: Int): Icon = when (status) {
+        com.github.baenar.harnessaside.core.HarnessStatus.THINKING,
+        com.github.baenar.harnessaside.core.HarnessStatus.EXECUTING_TOOL -> WALK[frame.mod(WALK_FRAMES)]
+        com.github.baenar.harnessaside.core.HarnessStatus.WAITING -> KICK[frame.mod(KICK_FRAMES)]
         else -> BASE
     }
 

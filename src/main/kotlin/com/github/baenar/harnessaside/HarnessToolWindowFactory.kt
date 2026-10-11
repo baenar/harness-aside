@@ -1,24 +1,31 @@
 package com.github.baenar.harnessaside
 
+import com.github.baenar.harnessaside.claude.ClaudeStatusHooks
+import com.github.baenar.harnessaside.claude.ClaudeStatusService
+import com.github.baenar.harnessaside.claude.DiagnoseStatusAction
+import com.github.baenar.harnessaside.claude.EnableStatusHooksAction
+import com.github.baenar.harnessaside.claude.NewClaudeSessionAction
+import com.github.baenar.harnessaside.claude.RemoveClaudeTabAction
+import com.github.baenar.harnessaside.claude.RestartClaudeTabAction
+import com.github.baenar.harnessaside.core.HarnessRegistry
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 
 /**
- * Opens a terminal in the right-docked tool window and starts Claude Code in it.
+ * Opens a terminal in the right-docked tool window and starts the default AI harness.
  *
- * The first tab resumes this directory's most recent session, or starts a fresh one when
- * there is none. Tab management and the launch itself live in [ClaudeTerminalService];
- * the status indicator in [ClaudeStatusService].
+ * Harness-specific logic is modularized into respective harness packages (e.g. `claude`).
  */
 class HarnessToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        val harness = HarnessRegistry.default
+
         toolWindow.setTitleActions(
             listOf(
                 NewClaudeSessionAction(toolWindow),
@@ -30,8 +37,7 @@ class HarnessToolWindowFactory : ToolWindowFactory {
             DefaultActionGroup(EnableStatusHooksAction(project), DiagnoseStatusAction(project))
         )
 
-        project.service<ClaudeStatusService>().ensureStarted()
-        project.service<ClaudeTerminalService>().openContinuedSession(toolWindow)
+        harness.openSession(project, toolWindow)
         offerStatusHooks(project)
     }
 
