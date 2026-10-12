@@ -63,3 +63,7 @@ git tag v0.1.0 && git push origin v0.1.0
 The tag sets the version (`-Pversion=0.1.0`), so `gradle.properties` only holds the dev default.
 Each release carries `harness-aside-<version>.zip` plus a copy named `harness-aside.zip`, which is
 what the stable "latest" download link above points at.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
