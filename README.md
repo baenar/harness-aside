@@ -1,9 +1,17 @@
-# harness-aside
+<h1 align="center">harness-aside</h1>
 
-[![Build](https://github.com/baenar/harness-aside/actions/workflows/build.yml/badge.svg)](https://github.com/baenar/harness-aside/actions/workflows/build.yml)
+<p align="center">
+  <img src="src/main/resources/icons/manul-working.svg" alt="Manul working" width="96" height="96" />
+</p>
 
-Private IntelliJ/PyCharm plugin: AI harnesses (Claude Code, Antigravity CLI, OpenCode) in a dedicated terminal tool window, docked on the right.
+<p align="center">
+  <a href="https://github.com/baenar/harness-aside/actions/workflows/build.yml"><img src="https://github.com/baenar/harness-aside/actions/workflows/build.yml/badge.svg" alt="Build" /></a>
+</p>
+
+Personal IntelliJ/PyCharm plugin: AI harnesses (Claude Code, Antigravity CLI, OpenCode) in a dedicated terminal tool window, docked on the right.
 Almost entirely vibecoded - use at your own risk:))
+
+Verified on **Windows**, **WSL**, and **Linux**.
 
 ## Install
 
@@ -14,16 +22,16 @@ All versions live under [Releases](https://github.com/baenar/harness-aside/relea
 
 ## Platform support
 
-*Confirmed* means exercised by hand end to end: the tab opens and resumes its session, the
+*Verified* means exercised by hand end to end: the tab opens and resumes its session, the
 icon animates while Claude works, waiting-for-approval shows, and Ctrl+C returns it to the
 still glyph.
 
-| Platform | Status                                                                                                         |
-|---|----------------------------------------------------------------------------------------------------------------|
-| Windows | **Confirmed** — IDE and Claude both on the Windows side                                                        |
-| WSL | **Confirmed** — IDE on Windows, Claude inside the distro, project under `/home`                                |
-| Linux | **Untested** — no known blocker, and CI runs the test suite on Ubuntu, but the plugin has never been run there |
-| macOS | **Unverified** — prolly safe to run, not tested                                                                |
+| Platform | Status                                                                          |
+|---|---------------------------------------------------------------------------------|
+| Windows  | **Verified** — IDE and Claude both on the Windows side                          |
+| WSL      | **Verified** — IDE on Windows, Claude inside the distro, project under `/home`  |
+| Linux    | **Verified** — exercised end to end natively on Linux                           |
+| macOS    | **Unverified** — prolly safe to run, not tested                                 |
 
 IDEs: developed and run against IntelliJ IDEA Community. PyCharm should load it — the
 plugin depends only on the platform and the terminal — but that is untested too.
