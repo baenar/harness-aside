@@ -1,34 +1,28 @@
 package com.github.baenar.harnessaside
 
-import com.github.baenar.harnessaside.claude.ClaudeStatusHooks
-import com.github.baenar.harnessaside.claude.ClaudeStatusService
 import com.github.baenar.harnessaside.claude.DiagnoseStatusAction
 import com.github.baenar.harnessaside.claude.EnableStatusHooksAction
-import com.github.baenar.harnessaside.claude.NewClaudeSessionAction
 import com.github.baenar.harnessaside.claude.RemoveClaudeTabAction
 import com.github.baenar.harnessaside.claude.RestartClaudeTabAction
-import com.github.baenar.harnessaside.core.HarnessRegistry
-import com.intellij.notification.NotificationAction
-import com.intellij.notification.NotificationGroupManager
-import com.intellij.notification.NotificationType
+import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.ui.content.ContentManagerEvent
+import com.intellij.ui.content.ContentManagerListener
 
 /**
- * Opens a terminal in the right-docked tool window and starts the default AI harness.
+ * Tool window factory for the dedicated right-docked AI harness tool window.
  *
- * Harness-specific logic is modularized into respective harness packages (e.g. `claude`).
+ * Enforces a single-tab invariant: displays the [HarnessLauncherPanel] when no session is running,
+ * and exactly one terminal tab when a harness session is active.
  */
 class HarnessToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val harness = HarnessRegistry.default
-
         toolWindow.setTitleActions(
             listOf(
-                NewClaudeSessionAction(toolWindow),
                 RestartClaudeTabAction(toolWindow),
                 RemoveClaudeTabAction(toolWindow),
             )
@@ -37,35 +31,16 @@ class HarnessToolWindowFactory : ToolWindowFactory {
             DefaultActionGroup(EnableStatusHooksAction(project), DiagnoseStatusAction(project))
         )
 
-        harness.openSession(project, toolWindow)
-        offerStatusHooks(project)
-    }
+        // Automatically return to the launcher whenever the active session tab is closed
+        toolWindow.contentManager.addContentManagerListener(object : ContentManagerListener {
+            override fun contentRemoved(event: ContentManagerEvent) {
+                if (!HarnessToolWindowUi.isSwitching && toolWindow.contentManager.contentCount == 0 && !project.isDisposed) {
+                    HarnessToolWindowUi.showLauncher(project, toolWindow)
+                }
+            }
+        })
 
-    /** On first open, offers (with consent) to install the hooks that drive the status icon. */
-    private fun offerStatusHooks(project: Project) {
-        val hooks = ClaudeStatusHooks.forProject(project) ?: return
-        if (hooks.isInstalled()) return
-
-        NotificationGroupManager.getInstance()
-            .getNotificationGroup(ClaudeStatusService.NOTIFICATION_GROUP)
-            .createNotification(
-                "Show Claude's status in the tool window?",
-                "Claude Aside can add hooks to <code>.claude/settings.json</code> that light the " +
-                    "tool-window icon while Claude is thinking, waiting for approval, or idle. " +
-                    "Restart the Claude tab afterwards for it to take effect.",
-                NotificationType.INFORMATION,
-            )
-            .addAction(NotificationAction.createSimple("Enable status indicator") {
-                val ok = hooks.install()
-                NotificationGroupManager.getInstance()
-                    .getNotificationGroup(ClaudeStatusService.NOTIFICATION_GROUP)
-                    .createNotification(
-                        if (ok) "Status hooks installed — restart the Claude tab to activate."
-                        else "Could not install status hooks (see idea.log).",
-                        if (ok) NotificationType.INFORMATION else NotificationType.WARNING,
-                    )
-                    .notify(project)
-            })
-            .notify(project)
+        // On open, always present the launcher view with supported harnesses
+        HarnessToolWindowUi.showLauncher(project, toolWindow)
     }
 }

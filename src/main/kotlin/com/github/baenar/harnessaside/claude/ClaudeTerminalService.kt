@@ -67,28 +67,35 @@ class ClaudeTerminalService(private val project: Project) {
         widget.sendCommandToExecute(command)
 
         val cm = toolWindow.contentManager
-        val tabTitle = title ?: if (cm.contentCount == 0) "Claude" else "Claude ${cm.contentCount + 1}"
-        val content = ContentFactory.getInstance().createContent(widget.component, tabTitle, false)
-        content.isCloseable = true
-        content.putUserData(WIDGET_KEY, widget)
-        content.putUserData(SESSION_KEY, sessionId)
+        com.github.baenar.harnessaside.ui.HarnessToolWindowUi.isSwitching = true
+        try {
+            cm.removeAllContents(true)
+            val tabTitle = title ?: "Claude Code"
+            val content = ContentFactory.getInstance().createContent(widget.component, tabTitle, false)
+            content.isCloseable = true
+            content.putUserData(WIDGET_KEY, widget)
+            content.putUserData(com.github.baenar.harnessaside.core.HarnessTerminalService.WIDGET_KEY, widget)
+            content.putUserData(SESSION_KEY, sessionId)
 
-        val status = project.service<ClaudeStatusService>()
-        // Scoped to this tab: the key watcher must go when the tab does.
-        val tabScope = Disposer.newDisposable("Claude Aside tab")
-        sessionId?.let {
-            status.registerTab(it, content)
-            status.watchInterruptKeys(widget.component, it, tabScope)
-        }
-        // Closing the tab disposes the widget, terminating the pty.
-        content.setDisposer {
-            sessionId?.let { status.unregisterTab(it) }
-            Disposer.dispose(tabScope)
-            Disposer.dispose(widget)
-        }
+            val status = project.service<ClaudeStatusService>()
+            // Scoped to this tab: the key watcher must go when the tab does.
+            val tabScope = Disposer.newDisposable("Claude Aside tab")
+            sessionId?.let {
+                status.registerTab(it, content)
+                status.watchInterruptKeys(widget.component, it, tabScope)
+            }
+            // Closing the tab disposes the widget, terminating the pty.
+            content.setDisposer {
+                sessionId?.let { status.unregisterTab(it) }
+                Disposer.dispose(tabScope)
+                Disposer.dispose(widget)
+            }
 
-        cm.addContent(content)
-        cm.setSelectedContent(content, true)
+            cm.addContent(content)
+            cm.setSelectedContent(content, true)
+        } finally {
+            com.github.baenar.harnessaside.ui.HarnessToolWindowUi.isSwitching = false
+        }
     }
 
     /** The terminal in the currently selected tab, or null when there is none. */
@@ -129,8 +136,10 @@ class ClaudeTerminalService(private val project: Project) {
     }
 
     companion object {
-        private val WIDGET_KEY = Key.create<TerminalWidget>("claude.aside.terminalWidget")
-        private val SESSION_KEY = Key.create<String>("claude.aside.sessionId")
+        val WIDGET_KEY: Key<TerminalWidget> = Key.create<TerminalWidget>("claude.aside.terminalWidget")
+        val SESSION_KEY: Key<String> = Key.create<String>("claude.aside.sessionId")
+
+        fun hasTerminal(content: Content?): Boolean = content?.getUserData(WIDGET_KEY) != null
 
         /** Name and forwarding flag of the variable that turns Claude's OSC 8 links off. */
         private const val FORWARDED = "FORCE_HYPERLINK/u"

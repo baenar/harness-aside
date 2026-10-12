@@ -19,6 +19,9 @@ object ClaudeStatusIcons {
     val DEFAULT: Icon by lazy { load("manul-default") }
     val BASE: Icon get() = DEFAULT
 
+    /** Dedicated Claude Code brand icon. */
+    val CLAUDE: Icon by lazy { load("claude") }
+
     /** Fallback static icons. */
     val WORKING: Icon by lazy { load("manul-working") }
     val HELP: Icon by lazy { load("manul-help") }

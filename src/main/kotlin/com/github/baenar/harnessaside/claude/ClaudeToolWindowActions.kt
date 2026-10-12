@@ -10,15 +10,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 
-/** Title-bar action: start a brand-new Claude session (`claude`). */
-class NewClaudeSessionAction(private val toolWindow: ToolWindow) :
-    AnAction("New Session", "Start a new Claude session", AllIcons.General.Add) {
-
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        project.service<ClaudeTerminalService>().openNewSession(toolWindow)
-    }
-}
+import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
 
 /** Title-bar action: close the current tab and reopen it resuming the same session. */
 class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
@@ -28,23 +20,26 @@ class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
         val project = e.project ?: return
         val cm = toolWindow.contentManager
         val closed = cm.selectedContent
-        // Resume exactly what this tab was running, not merely the newest session in the
-        // project — with several tabs open those are rarely the same conversation.
         val sessionId = ClaudeTerminalService.sessionIdOf(closed)
-        closed?.let { cm.removeContent(it, true) }
-        project.service<ClaudeTerminalService>().openContinuedSession(toolWindow, sessionId)
+        HarnessToolWindowUi.isSwitching = true
+        try {
+            closed?.let { cm.removeContent(it, true) }
+            project.service<ClaudeTerminalService>().openContinuedSession(toolWindow, sessionId)
+        } finally {
+            HarnessToolWindowUi.isSwitching = false
+        }
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabled = toolWindow.contentManager.contentCount > 0
+        e.presentation.isEnabled = HarnessToolWindowUi.hasActiveTerminal(toolWindow)
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 }
 
-/** Title-bar action: close the current tab, terminating its terminal (pty). */
+/** Title-bar action: close the current tab, terminating its terminal (pty) and returning to launcher. */
 class RemoveClaudeTabAction(private val toolWindow: ToolWindow) :
-    AnAction("Close Tab", "Close this tab and terminate its terminal", AllIcons.Actions.Close) {
+    AnAction("Close Tab", "Close this tab and return to harness launcher", AllIcons.Actions.Close) {
 
     override fun actionPerformed(e: AnActionEvent) {
         val cm = toolWindow.contentManager
@@ -53,7 +48,7 @@ class RemoveClaudeTabAction(private val toolWindow: ToolWindow) :
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabled = toolWindow.contentManager.contentCount > 0
+        e.presentation.isEnabled = HarnessToolWindowUi.hasActiveTerminal(toolWindow)
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
