@@ -8,136 +8,143 @@ const ICONS_DIR = path.resolve(__dirname, '../src/main/resources/icons');
 const LIGHT_COLOR = '#6C707E';
 const DARK_COLOR = '#CED0D6';
 
-// Paths:
-const DEFAULT_PATH = 'M4 5h3v1h-3zM17 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM16 6h1v1h-1zM20 6h1v1h-1zM2 7h1v5h-1zM7 7h10v1h-10zM21 7h1v5h-1zM8 9h1v1h-1zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM5 10h1v1h-1zM18 10h1v1h-1zM6 11h2v2h-2zM16 11h2v2h-2zM1 12h1v1h-1zM22 12h1v1h-1zM2 13h1v1h-1zM11 13h2v1h-2zM21 13h1v1h-1zM1 14h1v1h-1zM4 14h1v3h-1zM6 14h1v3h-1zM17 14h1v3h-1zM19 14h1v3h-1zM22 14h1v1h-1zM2 15h1v2h-1zM21 15h1v2h-1zM3 17h1v1h-1zM20 17h1v1h-1zM4 18h16v1h-16z';
+// Read user's v3 source files as templates:
+const defaultV3Raw = fs.readFileSync(path.join(ICONS_DIR, 'manul-default-v3.svg'), 'utf8');
+const workingV3Raw = fs.readFileSync(path.join(ICONS_DIR, 'manul-working-v3.svg'), 'utf8');
+const helpV3Raw = fs.readFileSync(path.join(ICONS_DIR, 'manul-help-v3.svg'), 'utf8');
 
-const WORK_BASE = 'M4 5h3v1h-3zM17 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM16 6h1v1h-1zM20 6h1v1h-1zM2 7h1v5h-1zM7 7h10v1h-10zM21 7h1v5h-1zM8 9h1v1h-1zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM1 12h1v1h-1zM22 12h1v1h-1zM2 13h1v1h-1zM11 13h2v1h-2zM21 13h1v1h-1zM1 14h1v1h-1zM4 14h1v3h-1zM6 14h1v3h-1zM17 14h1v3h-1zM19 14h1v3h-1zM22 14h1v1h-1zM2 15h1v2h-1zM21 15h1v2h-1zM3 17h1v1h-1zM20 17h1v1h-1zM4 18h16v1h-16zM4 23h3v1h-3zM8 23h2v1h-2zM11 23h2v1h-2zM14 23h2v1h-2zM17 23h3v1h-3z';
-const WORK_EYES_CENTER = 'M5 10h1v1h-1zM18 10h1v1h-1zM6 11h2v2h-2zM16 11h2v2h-2z';
-const WORK_EYES_RIGHT  = 'M6 10h1v1h-1zM19 10h1v1h-1zM7 11h2v2h-2zM17 11h2v2h-2z';
-const WORK_EYES_LEFT   = 'M4 10h1v1h-1zM17 10h1v1h-1zM5 11h2v2h-2zM15 11h2v2h-2z';
-const WORK_PAWS_A      = 'M15 20h2v1h-2zM7 21h2v1h-2zM14 21h4v1h-4zM6 22h4v1h-4z';
-const WORK_PAWS_B      = 'M7 20h2v1h-2zM6 21h4v1h-4zM15 21h2v1h-2zM14 22h4v1h-4z';
-const WORK_SWEAT_3     = 'M8 1h2v2h-2zM11 1h2v2h-2zM14 1h2v2h-2z';
-const WORK_SWEAT_1     = 'M8 1h2v2h-2z';
-const WORK_SWEAT_2     = 'M8 1h2v2h-2zM11 1h2v2h-2z';
+/**
+ * Transforms an SVG to use explicit palette hex colors (#6C707E or #CED0D6)
+ * instead of `currentColor` for stroke and fill attributes.
+ * This is CRITICAL for IntelliJ Platform's `SvgAttributePatcher`:
+ * IntelliJ's selection patcher matches explicit hex values (`#6C707E` / `#CED0D6`)
+ * and replaces them with `#FFFFFF` when a tool window button is selected/active (blue tab).
+ */
+function applyPaletteColors(svgContent, color) {
+  return svgContent
+    .replace(/stroke="currentColor"/g, `stroke="${color}"`)
+    .replace(/fill="currentColor"/g, `fill="${color}"`)
+    .replace(/color="[^"]*"/g, `color="${color}"`)
+    .replace(/width="[^"]+"/, 'width="20"')
+    .replace(/height="[^"]+"/, 'height="20"');
+}
 
-const WORK_FRAMES_PATHS = [
-  [WORK_BASE, WORK_EYES_CENTER, WORK_PAWS_A],
-  [WORK_BASE, WORK_EYES_CENTER, WORK_PAWS_B],
-  [WORK_BASE, WORK_EYES_RIGHT,  WORK_PAWS_A, WORK_SWEAT_1],
-  [WORK_BASE, WORK_EYES_RIGHT,  WORK_PAWS_B, WORK_SWEAT_1],
-  [WORK_BASE, WORK_EYES_CENTER, WORK_PAWS_A, WORK_SWEAT_2],
-  [WORK_BASE, WORK_EYES_CENTER, WORK_PAWS_B, WORK_SWEAT_2],
-  [WORK_BASE, WORK_EYES_LEFT,   WORK_PAWS_A, WORK_SWEAT_3],
-  [WORK_BASE, WORK_EYES_LEFT,   WORK_PAWS_B, WORK_SWEAT_3],
+// 1. Write manul-default and harnessAside
+const defaultLight = applyPaletteColors(defaultV3Raw, LIGHT_COLOR);
+const defaultDark = applyPaletteColors(defaultV3Raw, DARK_COLOR);
+
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-default.svg'), defaultLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-default_dark.svg'), defaultDark, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-default@20x20.svg'), defaultLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-default@20x20_dark.svg'), defaultDark, 'utf8');
+
+fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside.svg'), defaultLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside_dark.svg'), defaultDark, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside@20x20.svg'), defaultLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside@20x20_dark.svg'), defaultDark, 'utf8');
+
+// 2. Write manul-working from manul-working-v3 (fully animated CSS SVG)
+const workingLight = applyPaletteColors(workingV3Raw, LIGHT_COLOR);
+const workingDark = applyPaletteColors(workingV3Raw, DARK_COLOR);
+
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-working.svg'), workingLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-working_dark.svg'), workingDark, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-working@20x20.svg'), workingLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-working@20x20_dark.svg'), workingDark, 'utf8');
+
+// 3. Write manul-help from manul-help-v3 (fully animated CSS SVG)
+const helpLight = applyPaletteColors(helpV3Raw, LIGHT_COLOR);
+const helpDark = applyPaletteColors(helpV3Raw, DARK_COLOR);
+
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-help.svg'), helpLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-help_dark.svg'), helpDark, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-help@20x20.svg'), helpLight, 'utf8');
+fs.writeFileSync(path.join(ICONS_DIR, 'manul-help@20x20_dark.svg'), helpDark, 'utf8');
+
+// 4. Generate 8 static frames for manul_work_00..07 (for IntelliJ Swing runtime animation)
+const EYE_OFFSETS = [0, 0, 1, 1, 0, 0, -1, -1];
+const DOT_CONFIGS = [
+  { d1: { y: 1, op: 1.0 }, d2: { y: 2, op: 0.35 }, d3: { y: 2, op: 0.35 } },
+  { d1: { y: 2, op: 0.35 }, d2: { y: 1, op: 1.0 }, d3: { y: 2, op: 0.35 } },
+  { d1: { y: 2, op: 0.35 }, d2: { y: 2, op: 0.35 }, d3: { y: 1, op: 1.0 } },
+  { d1: { y: 2, op: 0.35 }, d2: { y: 2, op: 0.35 }, d3: { y: 2, op: 0.35 } },
+  { d1: { y: 1, op: 1.0 }, d2: { y: 2, op: 0.35 }, d3: { y: 2, op: 0.35 } },
+  { d1: { y: 2, op: 0.35 }, d2: { y: 1, op: 1.0 }, d3: { y: 2, op: 0.35 } },
+  { d1: { y: 2, op: 0.35 }, d2: { y: 2, op: 0.35 }, d3: { y: 1, op: 1.0 } },
+  { d1: { y: 2, op: 0.35 }, d2: { y: 2, op: 0.35 }, d3: { y: 2, op: 0.35 } },
 ];
 
-const HELP_CAT_CENTER_A = 'M4 5h3v1h-3zM17 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM16 6h1v1h-1zM20 6h1v1h-1zM2 7h1v5h-1zM7 7h10v1h-10zM21 7h1v5h-1zM8 9h1v1h-1zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM6 10h2v3h-2zM16 10h2v3h-2zM1 12h1v1h-1zM22 12h1v1h-1zM2 13h1v1h-1zM11 13h2v1h-2zM21 13h1v1h-1zM1 14h1v1h-1zM4 14h1v3h-1zM6 14h1v3h-1zM17 14h1v3h-1zM19 14h1v3h-1zM22 14h1v1h-1zM2 15h1v2h-1zM11 15h2v2h-2zM21 15h1v2h-1zM3 17h1v1h-1zM20 17h1v1h-1zM4 18h16v1h-16z';
-const HELP_CAT_RIGHT    = 'M5 5h3v1h-3zM18 5h3v1h-3zM4 6h1v1h-1zM8 6h1v1h-1zM17 6h1v1h-1zM21 6h1v1h-1zM3 7h1v5h-1zM8 7h10v1h-10zM22 7h1v5h-1zM9 9h1v1h-1zM11 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM7 10h2v3h-2zM17 10h2v3h-2zM2 12h1v1h-1zM23 12h1v1h-1zM3 13h1v1h-1zM12 13h2v1h-2zM22 13h1v1h-1zM2 14h1v1h-1zM5 14h1v3h-1zM7 14h1v3h-1zM18 14h1v3h-1zM20 14h1v3h-1zM23 14h1v1h-1zM3 15h1v2h-1zM12 15h2v2h-2zM22 15h1v2h-1zM4 17h1v1h-1zM21 17h1v1h-1zM5 18h16v1h-16z';
-const HELP_CAT_CENTER_B = 'M4 5h3v1h-3zM17 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM16 6h1v1h-1zM20 6h1v1h-1zM2 7h1v5h-1zM7 7h10v1h-10zM21 7h1v5h-1zM8 9h1v1h-1zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM6 10h2v3h-2zM16 10h2v3h-2zM1 12h1v1h-1zM22 12h1v1h-1zM2 13h1v1h-1zM11 13h2v1h-2zM21 13h1v1h-1zM1 14h1v1h-1zM4 14h1v3h-1zM6 14h1v3h-1zM17 14h1v3h-1zM19 14h1v3h-1zM22 14h1v1h-1zM2 15h1v2h-1zM11 15h2v1h-2zM21 15h1v2h-1zM3 17h1v1h-1zM20 17h1v1h-1zM4 18h16v1h-16z';
-const HELP_CAT_LEFT     = 'M3 5h3v1h-3zM16 5h3v1h-3zM2 6h1v1h-1zM6 6h1v1h-1zM15 6h1v1h-1zM19 6h1v1h-1zM1 7h1v5h-1zM6 7h10v1h-10zM20 7h1v5h-1zM7 9h1v1h-1zM9 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM5 10h2v3h-2zM15 10h2v3h-2zM0 12h1v1h-1zM21 12h1v1h-1zM1 13h1v1h-1zM10 13h2v1h-2zM20 13h1v1h-1zM0 14h1v1h-1zM3 14h1v3h-1zM5 14h1v3h-1zM16 14h1v3h-1zM18 14h1v3h-1zM21 14h1v1h-1zM1 15h1v2h-1zM10 15h2v1h-2zM20 15h1v2h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h16v1h-16z';
-const HELP_EXCLAMATION  = 'M11 0h2v3h-2zM11 4h2v2h-2z';
+function buildWorkFrame(frameIndex, color) {
+  const eyeOffset = EYE_OFFSETS[frameIndex];
+  const isLeftDown = (frameIndex % 2 === 0);
+  const leftPawY = isLeftDown ? '23' : '22.2';
+  const rightPawY = isLeftDown ? '22.2' : '23';
+  const dots = DOT_CONFIGS[frameIndex];
 
-const HELP_FRAMES_PATHS = [
-  [HELP_CAT_CENTER_A, HELP_EXCLAMATION],
-  [HELP_CAT_RIGHT,    HELP_EXCLAMATION],
-  [HELP_CAT_CENTER_B, HELP_EXCLAMATION],
-  [HELP_CAT_LEFT,     HELP_EXCLAMATION],
-  [HELP_CAT_CENTER_A, HELP_EXCLAMATION],
-  [HELP_CAT_RIGHT,    HELP_EXCLAMATION],
-  [HELP_CAT_CENTER_B],
-  [HELP_CAT_LEFT],
-];
-
-function buildSvg({ paths, color, size = 20, viewBox = '0 0 24 24', label = 'Manul' }) {
-  const combinedPath = paths.join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="${viewBox}" shape-rendering="crispEdges" role="img" aria-label="${label}">
-  <path fill="${color}" d="${combinedPath}"/>
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="mn mn4 mn4-work" color="${color}" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Manul pracuje (klatka ${frameIndex})">
+<path stroke="${color}" fill="none" d="M3.5 10C3 7.5 4.5 5.5 6.5 5.5C8 5.5 9 6.5 9.5 8Q12 7.4 14.5 8C15 6.5 16 5.5 17.5 5.5C19.5 5.5 21 7.5 20.5 10L22 12.5L20.8 14L21.8 16.5L19.5 17.2Q12 21.5 4.5 17.2L2.2 16.5L3.2 14L2 12.5Z"/>
+<path stroke="${color}" stroke-width="1.5" fill="none" d="M5.4 14.4L6.6 16.4M18.6 14.4L17.4 16.4"/>
+<g fill="${color}" stroke="none">
+<circle cx="${8 + eyeOffset}" cy="11.5" r="1.4" fill="${color}"/>
+<circle cx="${16 + eyeOffset}" cy="11.5" r="1.4" fill="${color}"/>
+</g>
+<path stroke="${color}" fill="${color}" stroke-width="1.2" d="M11 14h2l-1 1z"/>
+<path stroke="${color}" stroke-width="1.4" fill="none" d="M12 15.4Q11.2 16.6 10 16M12 15.4Q12.8 16.6 14 16"/>
+<path stroke="${color}" fill="none" d="M6.4 ${leftPawY}q1.6-1.6 3.2 0"/>
+<path stroke="${color}" fill="none" d="M14.4 ${rightPawY}q1.6-1.6 3.2 0"/>
+<g fill="${color}" stroke="none">
+<circle cx="9" cy="${dots.d1.y}" r="1.1" opacity="${dots.d1.op}" fill="${color}"/>
+<circle cx="12" cy="${dots.d2.y}" r="1.1" opacity="${dots.d2.op}" fill="${color}"/>
+<circle cx="15" cy="${dots.d3.y}" r="1.1" opacity="${dots.d3.op}" fill="${color}"/>
+</g>
 </svg>
 `;
-}
-
-function buildAnimatedWorkingSvg({ color, darkColor = null, size = 20 }) {
-  const isDark = darkColor === null;
-  const darkQuery = isDark ? '' : `@media(prefers-color-scheme:dark){.mn{color:${darkColor}}}`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="mn mn-work" color="${color}" viewBox="0 0 24 24" width="${size}" height="${size}" shape-rendering="crispEdges" role="img" aria-label="Manul pracuje">
-<title>Manul pracuje</title>
-<style>${darkQuery}.mn-work .mn-work0{animation:mn-work0 1.6s steps(1,end) infinite}@keyframes mn-work0{0%{opacity:1}25%{opacity:0}50%{opacity:1}75%{opacity:0}}.mn-work .mn-work1{animation:mn-work1 1.6s steps(1,end) infinite}@keyframes mn-work1{0%{opacity:0}25%{opacity:1}50%{opacity:0}}.mn-work .mn-work2{animation:mn-work2 1.6s steps(1,end) infinite}@keyframes mn-work2{0%{opacity:0}75%{opacity:1}}.mn-work .mn-work3{animation:mn-work3 1.6s steps(1,end) infinite}@keyframes mn-work3{0%{opacity:1}12.5%{opacity:0}25%{opacity:1}37.5%{opacity:0}50%{opacity:1}62.5%{opacity:0}75%{opacity:1}87.5%{opacity:0}}.mn-work .mn-work4{animation:mn-work4 1.6s steps(1,end) infinite}@keyframes mn-work4{0%{opacity:0}12.5%{opacity:1}25%{opacity:0}37.5%{opacity:1}50%{opacity:0}62.5%{opacity:1}75%{opacity:0}87.5%{opacity:1}}.mn-work .mn-work5{animation:mn-work5 1.6s steps(1,end) infinite}@keyframes mn-work5{0%{opacity:0}75%{opacity:1}}.mn-work .mn-work6{animation:mn-work6 1.6s steps(1,end) infinite}@keyframes mn-work6{0%{opacity:0}25%{opacity:1}50%{opacity:0}}.mn-work .mn-work7{animation:mn-work7 1.6s steps(1,end) infinite}@keyframes mn-work7{0%{opacity:0}50%{opacity:1}75%{opacity:0}}@media(prefers-reduced-motion:reduce){.mn-work path{animation:none!important}}</style>
-<path fill="currentColor" d="${WORK_BASE}"/>
-<path class="mn-work0" fill="currentColor" d="${WORK_EYES_CENTER}"/>
-<path class="mn-work1" opacity="0" fill="currentColor" d="${WORK_EYES_RIGHT}"/>
-<path class="mn-work2" opacity="0" fill="currentColor" d="${WORK_EYES_LEFT}"/>
-<path class="mn-work3" fill="currentColor" d="${WORK_PAWS_A}"/>
-<path class="mn-work4" opacity="0" fill="currentColor" d="${WORK_PAWS_B}"/>
-<path class="mn-work5" fill="currentColor" d="${WORK_SWEAT_3}"/>
-<path class="mn-work6" opacity="0" fill="currentColor" d="${WORK_SWEAT_1}"/>
-<path class="mn-work7" opacity="0" fill="currentColor" d="${WORK_SWEAT_2}"/>
-</svg>
-`;
-}
-
-function buildAnimatedHelpSvg({ color, darkColor = null, size = 20 }) {
-  const isDark = darkColor === null;
-  const darkQuery = isDark ? '' : `@media(prefers-color-scheme:dark){.mn{color:${darkColor}}}`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="mn mn-help" color="${color}" viewBox="0 0 24 24" width="${size}" height="${size}" shape-rendering="crispEdges" role="img" aria-label="Manul potrzebuje pomocy">
-<title>Manul potrzebuje pomocy</title>
-<style>${darkQuery}.mn-help .mn-help0{animation:mn-help0 0.96s steps(1,end) infinite}@keyframes mn-help0{0%{opacity:1}12.5%{opacity:0}50%{opacity:1}62.5%{opacity:0}}.mn-help .mn-help1{animation:mn-help1 0.96s steps(1,end) infinite}@keyframes mn-help1{0%{opacity:0}12.5%{opacity:1}25%{opacity:0}62.5%{opacity:1}75%{opacity:0}}.mn-help .mn-help2{animation:mn-help2 0.96s steps(1,end) infinite}@keyframes mn-help2{0%{opacity:0}25%{opacity:1}37.5%{opacity:0}75%{opacity:1}87.5%{opacity:0}}.mn-help .mn-help3{animation:mn-help3 0.96s steps(1,end) infinite}@keyframes mn-help3{0%{opacity:0}37.5%{opacity:1}50%{opacity:0}87.5%{opacity:1}}.mn-help .mn-help4{animation:mn-help4 0.96s steps(1,end) infinite}@keyframes mn-help4{0%{opacity:1}75%{opacity:0}}@media(prefers-reduced-motion:reduce){.mn-help path{animation:none!important}}</style>
-<path class="mn-help0" fill="currentColor" d="${HELP_CAT_CENTER_A}"/>
-<path class="mn-help1" opacity="0" fill="currentColor" d="${HELP_CAT_RIGHT}"/>
-<path class="mn-help2" opacity="0" fill="currentColor" d="${HELP_CAT_CENTER_B}"/>
-<path class="mn-help3" opacity="0" fill="currentColor" d="${HELP_CAT_LEFT}"/>
-<path class="mn-help4" fill="currentColor" d="${HELP_EXCLAMATION}"/>
-</svg>
-`;
-}
-
-function writeIconVariants(baseName, paths, label, viewBox = '0 0 24 24') {
-  const configs = [
-    { file: `${baseName}.svg`, color: LIGHT_COLOR, size: 20 },
-    { file: `${baseName}_dark.svg`, color: DARK_COLOR, size: 20 },
-    { file: `${baseName}@20x20.svg`, color: LIGHT_COLOR, size: 20 },
-    { file: `${baseName}@20x20_dark.svg`, color: DARK_COLOR, size: 20 },
-  ];
-
-  for (const cfg of configs) {
-    const content = buildSvg({
-      paths,
-      color: cfg.color,
-      size: cfg.size,
-      viewBox,
-      label,
-    });
-    const targetPath = path.join(ICONS_DIR, cfg.file);
-    fs.writeFileSync(targetPath, content, 'utf8');
-  }
-}
-
-// 1. Default / Idle icon (manul-default and harnessAside)
-writeIconVariants('manul-default', [DEFAULT_PATH], 'Manul — domyślne logo');
-writeIconVariants('harnessAside', [DEFAULT_PATH], 'Harness Aside');
-
-// 2. Fully animated SVGs (retaining all CSS @keyframes animations)
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working.svg'), buildAnimatedWorkingSvg({ color: LIGHT_COLOR, darkColor: DARK_COLOR, size: 20 }));
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working_dark.svg'), buildAnimatedWorkingSvg({ color: DARK_COLOR, size: 20 }));
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working@20x20.svg'), buildAnimatedWorkingSvg({ color: LIGHT_COLOR, darkColor: DARK_COLOR, size: 20 }));
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working@20x20_dark.svg'), buildAnimatedWorkingSvg({ color: DARK_COLOR, size: 20 }));
-
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help.svg'), buildAnimatedHelpSvg({ color: LIGHT_COLOR, darkColor: DARK_COLOR, size: 20 }));
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help_dark.svg'), buildAnimatedHelpSvg({ color: DARK_COLOR, size: 20 }));
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help@20x20.svg'), buildAnimatedHelpSvg({ color: LIGHT_COLOR, darkColor: DARK_COLOR, size: 20 }));
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help@20x20_dark.svg'), buildAnimatedHelpSvg({ color: DARK_COLOR, size: 20 }));
-
-// 3. Frame-by-frame SVGs (00..07) for IntelliJ Swing runtime timer
-for (let i = 0; i < 8; i++) {
-  const pad = String(i).padStart(2, '0');
-  writeIconVariants(`manul_work_${pad}`, WORK_FRAMES_PATHS[i], `Manul pracuje (klatka ${i})`);
 }
 
 for (let i = 0; i < 8; i++) {
   const pad = String(i).padStart(2, '0');
-  writeIconVariants(`manul_help_${pad}`, HELP_FRAMES_PATHS[i], `Manul potrzebuje pomocy (klatka ${i})`);
+  const light = buildWorkFrame(i, LIGHT_COLOR);
+  const dark = buildWorkFrame(i, DARK_COLOR);
+
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_work_${pad}.svg`), light, 'utf8');
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_work_${pad}_dark.svg`), dark, 'utf8');
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_work_${pad}@20x20.svg`), light, 'utf8');
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_work_${pad}@20x20_dark.svg`), dark, 'utf8');
 }
 
-console.log('Successfully generated all Manul SVG icons (including full CSS @keyframes animations in main SVGs)!');
+// 5. Generate 8 static frames for manul_help_00..07 (for IntelliJ Swing runtime animation)
+const SHAKE_DX = [0, 0.7, 1.0, 0.7, 0, -0.7, -1.0, -0.7];
+
+function buildHelpFrame(frameIndex, color) {
+  const dx = SHAKE_DX[frameIndex];
+  const showBang = frameIndex < 6;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="mn mn4 mn4-help" color="${color}" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Manul potrzebuje pomocy (klatka ${frameIndex})">
+<g transform="translate(${dx}, 0)">
+<path stroke="${color}" fill="none" d="M3.5 10C3 7.5 4.5 5.5 6.5 5.5C8 5.5 9 6.5 9.5 8Q12 7.4 14.5 8C15 6.5 16 5.5 17.5 5.5C19.5 5.5 21 7.5 20.5 10L22 12.5L20.8 14L21.8 16.5L19.5 17.2Q12 21.5 4.5 17.2L2.2 16.5L3.2 14L2 12.5Z"/>
+<path stroke="${color}" stroke-width="1.5" fill="none" d="M5.4 14.4L6.6 16.4M18.6 14.4L17.4 16.4"/>
+<circle cx="8" cy="11.5" r="1.8" fill="${color}" stroke="none"/>
+<circle cx="16" cy="11.5" r="1.8" fill="${color}" stroke="none"/>
+<path stroke="${color}" fill="${color}" stroke-width="1.2" d="M11 14h2l-1 1z"/>
+<path stroke="${color}" stroke-width="1.4" fill="none" d="M12 15.4Q11.2 16.6 10 16M12 15.4Q12.8 16.6 14 16"/>
+</g>
+${showBang ? `<g class="bang">
+<path stroke="${color}" fill="none" d="M12 .9V2.4"/>
+<circle cx="12" cy="4.4" r=".9" fill="${color}" stroke="none"/>
+</g>` : ''}
+</svg>
+`;
+}
+
+for (let i = 0; i < 8; i++) {
+  const pad = String(i).padStart(2, '0');
+  const light = buildHelpFrame(i, LIGHT_COLOR);
+  const dark = buildHelpFrame(i, DARK_COLOR);
+
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_help_${pad}.svg`), light, 'utf8');
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_help_${pad}_dark.svg`), dark, 'utf8');
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_help_${pad}@20x20.svg`), light, 'utf8');
+  fs.writeFileSync(path.join(ICONS_DIR, `manul_help_${pad}@20x20_dark.svg`), dark, 'utf8');
+}
+
+console.log('Successfully generated all v3 Manul SVG icons with explicit palette colors!');

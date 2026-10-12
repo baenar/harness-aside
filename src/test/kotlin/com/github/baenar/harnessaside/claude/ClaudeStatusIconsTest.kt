@@ -60,7 +60,7 @@ class ClaudeStatusIconsTest {
     }
 
     @Test
-    fun `icons do not use hardcoded black or currentcolor`() {
+    fun `icons use theme action gray and do not use hardcoded black or currentColor`() {
         val names = listOf("manul-default", "manul_work_00", "manul_help_00")
         for (name in names) {
             val lightSvg = javaClass.getResource("/icons/$name.svg")!!.readText()

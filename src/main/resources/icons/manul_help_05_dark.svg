@@ -1,3 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" shape-rendering="crispEdges" role="img" aria-label="Manul potrzebuje pomocy (klatka 5)">
-  <path fill="#CED0D6" d="M5 5h3v1h-3zM18 5h3v1h-3zM4 6h1v1h-1zM8 6h1v1h-1zM17 6h1v1h-1zM21 6h1v1h-1zM3 7h1v5h-1zM8 7h10v1h-10zM22 7h1v5h-1zM9 9h1v1h-1zM11 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM7 10h2v3h-2zM17 10h2v3h-2zM2 12h1v1h-1zM23 12h1v1h-1zM3 13h1v1h-1zM12 13h2v1h-2zM22 13h1v1h-1zM2 14h1v1h-1zM5 14h1v3h-1zM7 14h1v3h-1zM18 14h1v3h-1zM20 14h1v3h-1zM23 14h1v1h-1zM3 15h1v2h-1zM12 15h2v2h-2zM22 15h1v2h-1zM4 17h1v1h-1zM21 17h1v1h-1zM5 18h16v1h-16zM11 0h2v3h-2zM11 4h2v2h-2z"/>
+<svg xmlns="http://www.w3.org/2000/svg" class="mn mn4 mn4-help" color="#CED0D6" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#CED0D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Manul potrzebuje pomocy (klatka 5)">
+<g transform="translate(-0.7, 0)">
+<path stroke="#CED0D6" fill="none" d="M3.5 10C3 7.5 4.5 5.5 6.5 5.5C8 5.5 9 6.5 9.5 8Q12 7.4 14.5 8C15 6.5 16 5.5 17.5 5.5C19.5 5.5 21 7.5 20.5 10L22 12.5L20.8 14L21.8 16.5L19.5 17.2Q12 21.5 4.5 17.2L2.2 16.5L3.2 14L2 12.5Z"/>
+<path stroke="#CED0D6" stroke-width="1.5" fill="none" d="M5.4 14.4L6.6 16.4M18.6 14.4L17.4 16.4"/>
+<circle cx="8" cy="11.5" r="1.8" fill="#CED0D6" stroke="none"/>
+<circle cx="16" cy="11.5" r="1.8" fill="#CED0D6" stroke="none"/>
+<path stroke="#CED0D6" fill="#CED0D6" stroke-width="1.2" d="M11 14h2l-1 1z"/>
+<path stroke="#CED0D6" stroke-width="1.4" fill="none" d="M12 15.4Q11.2 16.6 10 16M12 15.4Q12.8 16.6 14 16"/>
+</g>
+<g class="bang">
+<path stroke="#CED0D6" fill="none" d="M12 .9V2.4"/>
+<circle cx="12" cy="4.4" r=".9" fill="#CED0D6" stroke="none"/>
+</g>
 </svg>

@@ -1,3 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" shape-rendering="crispEdges" role="img" aria-label="Manul — domyślne logo">
-  <path fill="#6C707E" d="M4 5h3v1h-3zM17 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM16 6h1v1h-1zM20 6h1v1h-1zM2 7h1v5h-1zM7 7h10v1h-10zM21 7h1v5h-1zM8 9h1v1h-1zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM5 10h1v1h-1zM18 10h1v1h-1zM6 11h2v2h-2zM16 11h2v2h-2zM1 12h1v1h-1zM22 12h1v1h-1zM2 13h1v1h-1zM11 13h2v1h-2zM21 13h1v1h-1zM1 14h1v1h-1zM4 14h1v3h-1zM6 14h1v3h-1zM17 14h1v3h-1zM19 14h1v3h-1zM22 14h1v1h-1zM2 15h1v2h-1zM21 15h1v2h-1zM3 17h1v1h-1zM20 17h1v1h-1zM4 18h16v1h-16z"/>
+<svg xmlns="http://www.w3.org/2000/svg" class="mn mn4" color="#6C707E" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6C707E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Manul — domyślne logo">
+<title>Manul — domyślne logo</title>
+<style>@media(prefers-color-scheme:dark){.mn{color:#CED0D6}}</style>
+<path stroke="#6C707E" fill="none" d="M3.5 10C3 7.5 4.5 5.5 6.5 5.5C8 5.5 9 6.5 9.5 8Q12 7.4 14.5 8C15 6.5 16 5.5 17.5 5.5C19.5 5.5 21 7.5 20.5 10L22 12.5L20.8 14L21.8 16.5L19.5 17.2Q12 21.5 4.5 17.2L2.2 16.5L3.2 14L2 12.5Z"/>
+<path stroke="#6C707E" stroke-width="1.5" fill="none" d="M5.4 14.4L6.6 16.4M18.6 14.4L17.4 16.4"/>
+<circle cx="8" cy="11.5" r="1.4" fill="#6C707E" stroke="none"/>
+<circle cx="16" cy="11.5" r="1.4" fill="#6C707E" stroke="none"/>
+<path stroke="#6C707E" fill="#6C707E" stroke-width="1.2" d="M11 14h2l-1 1z"/>
+<path stroke="#6C707E" stroke-width="1.4" fill="none" d="M12 15.4Q11.2 16.6 10 16M12 15.4Q12.8 16.6 14 16"/>
 </svg>

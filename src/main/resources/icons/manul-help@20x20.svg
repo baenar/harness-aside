@@ -1,9 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" class="mn mn-help" color="#6C707E" viewBox="0 0 24 24" width="20" height="20" shape-rendering="crispEdges" role="img" aria-label="Manul potrzebuje pomocy">
+<svg xmlns="http://www.w3.org/2000/svg" class="mn mn4 mn4-help" color="#6C707E" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6C707E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Manul potrzebuje pomocy">
 <title>Manul potrzebuje pomocy</title>
-<style>@media(prefers-color-scheme:dark){.mn{color:#CED0D6}}.mn-help .mn-help0{animation:mn-help0 0.96s steps(1,end) infinite}@keyframes mn-help0{0%{opacity:1}12.5%{opacity:0}50%{opacity:1}62.5%{opacity:0}}.mn-help .mn-help1{animation:mn-help1 0.96s steps(1,end) infinite}@keyframes mn-help1{0%{opacity:0}12.5%{opacity:1}25%{opacity:0}62.5%{opacity:1}75%{opacity:0}}.mn-help .mn-help2{animation:mn-help2 0.96s steps(1,end) infinite}@keyframes mn-help2{0%{opacity:0}25%{opacity:1}37.5%{opacity:0}75%{opacity:1}87.5%{opacity:0}}.mn-help .mn-help3{animation:mn-help3 0.96s steps(1,end) infinite}@keyframes mn-help3{0%{opacity:0}37.5%{opacity:1}50%{opacity:0}87.5%{opacity:1}}.mn-help .mn-help4{animation:mn-help4 0.96s steps(1,end) infinite}@keyframes mn-help4{0%{opacity:1}75%{opacity:0}}@media(prefers-reduced-motion:reduce){.mn-help path{animation:none!important}}</style>
-<path class="mn-help0" fill="currentColor" d="M4 5h3v1h-3zM17 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM16 6h1v1h-1zM20 6h1v1h-1zM2 7h1v5h-1zM7 7h10v1h-10zM21 7h1v5h-1zM8 9h1v1h-1zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM6 10h2v3h-2zM16 10h2v3h-2zM1 12h1v1h-1zM22 12h1v1h-1zM2 13h1v1h-1zM11 13h2v1h-2zM21 13h1v1h-1zM1 14h1v1h-1zM4 14h1v3h-1zM6 14h1v3h-1zM17 14h1v3h-1zM19 14h1v3h-1zM22 14h1v1h-1zM2 15h1v2h-1zM11 15h2v2h-2zM21 15h1v2h-1zM3 17h1v1h-1zM20 17h1v1h-1zM4 18h16v1h-16z"/>
-<path class="mn-help1" opacity="0" fill="currentColor" d="M5 5h3v1h-3zM18 5h3v1h-3zM4 6h1v1h-1zM8 6h1v1h-1zM17 6h1v1h-1zM21 6h1v1h-1zM3 7h1v5h-1zM8 7h10v1h-10zM22 7h1v5h-1zM9 9h1v1h-1zM11 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM7 10h2v3h-2zM17 10h2v3h-2zM2 12h1v1h-1zM23 12h1v1h-1zM3 13h1v1h-1zM12 13h2v1h-2zM22 13h1v1h-1zM2 14h1v1h-1zM5 14h1v3h-1zM7 14h1v3h-1zM18 14h1v3h-1zM20 14h1v3h-1zM23 14h1v1h-1zM3 15h1v2h-1zM12 15h2v2h-2zM22 15h1v2h-1zM4 17h1v1h-1zM21 17h1v1h-1zM5 18h16v1h-16z"/>
-<path class="mn-help2" opacity="0" fill="currentColor" d="M4 5h3v1h-3zM17 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM16 6h1v1h-1zM20 6h1v1h-1zM2 7h1v5h-1zM7 7h10v1h-10zM21 7h1v5h-1zM8 9h1v1h-1zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM6 10h2v3h-2zM16 10h2v3h-2zM1 12h1v1h-1zM22 12h1v1h-1zM2 13h1v1h-1zM11 13h2v1h-2zM21 13h1v1h-1zM1 14h1v1h-1zM4 14h1v3h-1zM6 14h1v3h-1zM17 14h1v3h-1zM19 14h1v3h-1zM22 14h1v1h-1zM2 15h1v2h-1zM11 15h2v1h-2zM21 15h1v2h-1zM3 17h1v1h-1zM20 17h1v1h-1zM4 18h16v1h-16z"/>
-<path class="mn-help3" opacity="0" fill="currentColor" d="M3 5h3v1h-3zM16 5h3v1h-3zM2 6h1v1h-1zM6 6h1v1h-1zM15 6h1v1h-1zM19 6h1v1h-1zM1 7h1v5h-1zM6 7h10v1h-10zM20 7h1v5h-1zM7 9h1v1h-1zM9 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM5 10h2v3h-2zM15 10h2v3h-2zM0 12h1v1h-1zM21 12h1v1h-1zM1 13h1v1h-1zM10 13h2v1h-2zM20 13h1v1h-1zM0 14h1v1h-1zM3 14h1v3h-1zM5 14h1v3h-1zM16 14h1v3h-1zM18 14h1v3h-1zM21 14h1v1h-1zM1 15h1v2h-1zM10 15h2v1h-2zM20 15h1v2h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h16v1h-16z"/>
-<path class="mn-help4" fill="currentColor" d="M11 0h2v3h-2zM11 4h2v2h-2z"/>
+<style>@media(prefers-color-scheme:dark){.mn{color:#CED0D6}}.mn4-help .face{animation:mn4-shake .96s ease-in-out infinite}@keyframes mn4-shake{0%,50%,100%{transform:translateX(0)}25%{transform:translateX(1px)}75%{transform:translateX(-1px)}}.mn4-help .bang{animation:mn4-bang .96s steps(1,end) infinite}@keyframes mn4-bang{0%{opacity:1}75%{opacity:0}}@media(prefers-reduced-motion:reduce){.mn4-help *{animation:none!important}}</style>
+<g class="face">
+<path stroke="#6C707E" fill="none" d="M3.5 10C3 7.5 4.5 5.5 6.5 5.5C8 5.5 9 6.5 9.5 8Q12 7.4 14.5 8C15 6.5 16 5.5 17.5 5.5C19.5 5.5 21 7.5 20.5 10L22 12.5L20.8 14L21.8 16.5L19.5 17.2Q12 21.5 4.5 17.2L2.2 16.5L3.2 14L2 12.5Z"/>
+<path stroke="#6C707E" stroke-width="1.5" fill="none" d="M5.4 14.4L6.6 16.4M18.6 14.4L17.4 16.4"/>
+<circle cx="8" cy="11.5" r="1.8" fill="#6C707E" stroke="none"/>
+<circle cx="16" cy="11.5" r="1.8" fill="#6C707E" stroke="none"/>
+<path stroke="#6C707E" fill="#6C707E" stroke-width="1.2" d="M11 14h2l-1 1z"/>
+<path stroke="#6C707E" stroke-width="1.4" fill="none" d="M12 15.4Q11.2 16.6 10 16M12 15.4Q12.8 16.6 14 16"/>
+</g>
+<g class="bang">
+<path stroke="#6C707E" fill="none" d="M12 .9V2.4"/>
+<circle cx="12" cy="4.4" r=".9" fill="#6C707E" stroke="none"/>
+</g>
 </svg>
