@@ -69,12 +69,12 @@ jobs:
         run: ./gradlew check buildPlugin "-Pversion=$VERSION"
 
       # A second, version-less copy so README can link to a URL that never changes:
-      # https://github.com/baenar/claude-aside/releases/latest/download/claude-aside.zip
+      # https://github.com/baenar/harness-aside/releases/latest/download/harness-aside.zip
       - name: Prepare assets
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          cp "build/distributions/claude-aside-$VERSION.zip" "build/distributions/claude-aside.zip"
+          cp "build/distributions/harness-aside-$VERSION.zip" "build/distributions/harness-aside.zip"
           ls -l build/distributions
 
       # `gh` is preinstalled on GitHub-hosted runners, so no third-party action is involved.
@@ -86,11 +86,11 @@ jobs:
         run: |
           if gh release view "v$VERSION" >/dev/null 2>&1; then
             gh release upload "v$VERSION" \
-              "build/distributions/claude-aside-$VERSION.zip" \
-              "build/distributions/claude-aside.zip" --clobber
+              "build/distributions/harness-aside-$VERSION.zip" \
+              "build/distributions/harness-aside.zip" --clobber
           else
             gh release create "v$VERSION" \
-              "build/distributions/claude-aside-$VERSION.zip" \
-              "build/distributions/claude-aside.zip" \
+              "build/distributions/harness-aside-$VERSION.zip" \
+              "build/distributions/harness-aside.zip" \
               --title "v$VERSION" --generate-notes --target "$GITHUB_SHA"
           fi

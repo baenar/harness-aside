@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mn mn2-work" color="#6C707E" viewBox="0 0 16 16" width="20" height="20" shape-rendering="crispEdges" role="img" aria-label="Manul pracuje">
+<title>Manul pracuje</title>
+<style>@media(prefers-color-scheme:dark){.mn{color:#CED0D6}}.mn2-w0{animation:mn2-w0 1.6s steps(1,end) infinite}@keyframes mn2-w0{0%{opacity:1}25%{opacity:0}50%{opacity:1}75%{opacity:0}}.mn2-w1{animation:mn2-w1 1.6s steps(1,end) infinite}@keyframes mn2-w1{0%{opacity:0}25%{opacity:1}50%{opacity:0}}.mn2-w2{animation:mn2-w2 1.6s steps(1,end) infinite}@keyframes mn2-w2{0%{opacity:0}75%{opacity:1}}.mn2-w3{animation:mn2-w3 1.6s steps(1,end) infinite}@keyframes mn2-w3{0%{opacity:1}12.5%{opacity:0}25%{opacity:1}37.5%{opacity:0}50%{opacity:1}62.5%{opacity:0}75%{opacity:1}87.5%{opacity:0}}.mn2-w4{animation:mn2-w4 1.6s steps(1,end) infinite}@keyframes mn2-w4{0%{opacity:0}12.5%{opacity:1}25%{opacity:0}37.5%{opacity:1}50%{opacity:0}62.5%{opacity:1}75%{opacity:0}87.5%{opacity:1}}.mn2-w5{animation:mn2-w5 1.6s steps(1,end) infinite}@keyframes mn2-w5{0%{opacity:0}75%{opacity:1}}.mn2-w6{animation:mn2-w6 1.6s steps(1,end) infinite}@keyframes mn2-w6{0%{opacity:0}25%{opacity:1}50%{opacity:0}}.mn2-w7{animation:mn2-w7 1.6s steps(1,end) infinite}@keyframes mn2-w7{0%{opacity:0}50%{opacity:1}75%{opacity:0}}@media(prefers-reduced-motion:reduce){.mn2-work path{animation:none!important}}</style>
+<path fill="currentColor" d="M2 4h2v1h-2zM12 4h2v1h-2zM1 5h1v1h-1zM4 5h8v1h-8zM14 5h1v1h-1zM1 6h1v1h-1zM14 6h1v1h-1zM1 7h1v1h-1zM14 7h1v1h-1zM1 8h1v1h-1zM14 8h1v1h-1zM1 9h1v1h-1zM14 9h1v1h-1zM1 10h1v1h-1zM3 10h1v1h-1zM7 10h2v1h-2zM12 10h1v1h-1zM14 10h1v1h-1zM2 11h1v1h-1zM13 11h1v1h-1zM3 12h10v1h-10z"/>
+<path class="mn2-w0" fill="currentColor" d="M3 7h1v1h-1zM12 7h1v1h-1zM4 8h2v1h-2zM10 8h2v1h-2zM4 9h2v1h-2zM10 9h2v1h-2z"/>
+<path class="mn2-w1" opacity="0" fill="currentColor" d="M4 7h1v1h-1zM13 7h1v1h-1zM5 8h2v1h-2zM11 8h2v1h-2zM5 9h2v1h-2zM11 9h2v1h-2z"/>
+<path class="mn2-w2" opacity="0" fill="currentColor" d="M2 7h1v1h-1zM11 7h1v1h-1zM3 8h2v1h-2zM9 8h2v1h-2zM3 9h2v1h-2zM9 9h2v1h-2z"/>
+<path class="mn2-w3" fill="currentColor" d="M4 14h3v1h-3zM9 15h3v1h-3z"/>
+<path class="mn2-w4" opacity="0" fill="currentColor" d="M9 14h3v1h-3zM4 15h3v1h-3z"/>
+<path class="mn2-w5" fill="currentColor" d="M4 1h2v1h-2zM7 1h2v1h-2zM10 1h2v1h-2zM4 2h2v1h-2zM7 2h2v1h-2zM10 2h2v1h-2z"/>
+<path class="mn2-w6" opacity="0" fill="currentColor" d="M4 1h2v1h-2zM4 2h2v1h-2z"/>
+<path class="mn2-w7" opacity="0" fill="currentColor" d="M4 1h2v1h-2zM7 1h2v1h-2zM4 2h2v1h-2zM7 2h2v1h-2z"/>
+</svg>

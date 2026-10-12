@@ -1,430 +1,221 @@
-# Claude Aside — Development Plan
+# Harness Aside — Development Plan & Multi-Harness Architecture
 
-## Problem
+## 1. Problem & Vision
 
-Claude Code runs in a regular Terminal tool window tab. Mixed with compile/`gh`/misc
-tabs it becomes hard to navigate, especially with a narrow terminal panel.
+`harness-aside` (formerly `harness-aside`) embeds AI coding harnesses directly into a dedicated tool window docked on the **right** (next to Gradle/Database/Maven), keeping the primary bottom terminal area clean for regular compilation, git commands, and shell operations.
 
-## Solution
-
-Separate the two: regular terminals stay at the bottom (default), Claude Code gets its
-own tool window docked **right** (next to Gradle/Database). One click on the stripe
-button opens a terminal already running Claude with the previous session resumed.
+While the initial version focused exclusively on Claude Code, the project is being restructured into a **multi-harness platform**, supporting:
+- 🟠 **Claude Code** (`claude -c`)
+- 🔵 **Antigravity CLI** (`agy`)
+- 🟣 **OpenCode CLI** (`opencode`)
 
 ---
 
-## Facts the design relies on (verified)
+## 2. Analiza stanu obecnego i refaktoryzacja
 
-### Claude Code CLI & session storage
+### Stan pierwotny (`harness-aside`)
+- `ClaudeToolWindowFactory.kt`: Używał `LocalTerminalDirectRunner` do uruchomienia widgetu terminala JetBrains w prawym docku i wysyłał polecenie startu sesji Claude.
+- `ClaudeTerminalService.kt`: Zarządzał kartami terminala i wstrzykiwaniem komend.
+- `ClaudeStatusService.kt`: Odczytywał stan Claude przez odpytywanie plików w `.claude/aside-status` i tail transcriptu JSONL.
+- `plugin.xml`: Rejestrował jedno okno narzędziowe.
 
-Verified against `claude` 2.1.228 on this machine.
-
-| Fact | Detail |
-|---|---|
-| Session files | `~/.claude/projects/<encoded-path>/*.jsonl`, one file per session (the dir may also hold non-session entries such as `memory/` — filter on `*.jsonl`, not "dir is non-empty") |
-| Path encoding | every non-alphanumeric char becomes `-`, including `/`, `.` **and `_`**: `/home/x/dot.test_dir` → `-home-x-dot-test-dir` |
-| `claude` | starts a fresh session in cwd |
-| `claude -c` / `--continue` | resumes the most recent session for cwd; **falls back to a fresh session when there is none** — verified in an empty dir both with `-p` and interactively under a pty |
-| `claude -r` / `--resume` | resumes by session id, or opens the built-in interactive picker |
-| `claude --fork-session` | on resume, branches into a new session id |
-
-Launch command on tool window open: **`claude -c`** through Phase 3 — since `-c` degrades
-to a fresh session on its own, Phase 1 needs no session lookup and no path encoding.
-Phase 3.1 replaces it with `-r <id>` / `--session-id <uuid>`: `-c` never reveals *which*
-session it resumed, and per-tab status needs that. Path encoding is what maps a session to
-its state and transcript files.
-
-> Note: the first launch in a directory the user has not opened before shows Claude's
-> "Is this a project you trust?" prompt instead of the session. Expected, not a bug —
-> but it will show up on every fresh `runIde` sandbox.
-
-### IntelliJ Platform APIs (verified with `javap` against IC 2025.2.6 jars)
-
-| API | Use |
-|---|---|
-| `toolWindow` extension point, `anchor="right"` | registers the stripe button + panel |
-| `LocalTerminalDirectRunner.createTerminalRunner(project)` | terminal runner honoring the IDE shell settings (incl. WSL shells) |
-| `runner.startShellTerminalWidget(disposable, ShellStartupOptions, deferUntilShown)` → `com.intellij.terminal.ui.TerminalWidget` | creates an embeddable terminal session; **not** `@Deprecated`, **not** `@ApiStatus.Internal` — unlike the whole older `createTerminalWidget` family on the same class |
-| `ShellStartupOptions.Builder().workingDirectory(path).build()` | start in project root |
-| `TerminalWidget.sendCommandToExecute("claude -c")` | inject the command into the shell (survives Claude exit — user lands back in shell) |
-| `TerminalWidget.getComponent()` | Swing component to put into a `Content` |
-| `ToolWindow.setIcon(...)`, `ContentManager` | dynamic status icon, multiple tabs |
-
-Why `sendCommandToExecute` instead of `ShellStartupOptions.shellCommand(["claude","-c"])`:
-with `shellCommand` the terminal dies when Claude exits; injecting into the default
-shell keeps the tab usable and works identically for local and WSL shells. Trade-off:
-the command lands in shell history — acceptable.
+### Nowy kierunek (`harness-aside`)
+Claude Code staje się **jednym z obsługiwanych harnessów**. Architektura zostaje ujednolicona wokół interfejsu harnessu, z dedykowanym widokiem startowym (Launcher Panel), ścisłą zasadą jednej aktywnej karty oraz lekkim protokołem IPC powiadamiania o statusie.
 
 ---
 
-## Architecture
+## 3. Architektura: Lightweight & Minimalne Obciążenie CPU
+
+Aby plugin nie obciążał procesora i działał płynnie, kluczowy jest wybór sposobu wykrywania stanu agenta:
+
+### Czego unikać (Antywzorzec):
+- ❌ **Scraping / parsing bufora terminala (ANSI regex):** Odczytywanie tekstu z terminala w pętli pollera pożera mnóstwo CPU, zawiesza wątek UI (EDT) i jest skrajnie niestabilne ze względu na dynamiczne przerysowywanie TUI (biblioteki Ink/Bubbletea/Curses czyszczą linie i nadpisują ekran).
+
+### Rekomendowane rozwiązanie: Push-based Event IPC (Zero CPU w spoczynku)
+- ✔️ **Lokalny mikro-odbiornik HTTP/Socket (Localhost Loopback):**
+  - Podczas inicjalizacji okna, plugin uruchamia w pamięci mikroserwer (np. standardowy `com.sun.net.httpserver.HttpServer` z JDK na losowym porcie 127.0.0.1 lub ephemeral TCP port).
+  - Przy starcie terminala plugin wstrzykuje do zmiennych środowiskowych powłoki:
+    ```bash
+    HARNESS_IDE_PORT=49152
+    HARNESS_IDE_TOKEN=secret_xyz
+    ```
+  - Hooki i pluginy w danym harnessie wykonują jedno mikrosekundowe żądanie (np. `curl -s -X POST http://127.0.0.1:$HARNESS_IDE_PORT/status?state=thinking` lub JS `fetch()`).
+  - **Koszt CPU:**
+    - W spoczynku: **0.00%** (brak pętli, brak timerów, selektor asynchroniczny).
+    - Podczas zmiany stanu: dokładnie jedno zdarzenie i przełączenie ikony.
 
 ```mermaid
-graph LR
-    subgraph plugin [claude-aside plugin]
-        F[ClaudeToolWindowFactory<br/>creates content on first open]
-        S[ClaudeTerminalService<br/>@Service Level.PROJECT<br/>owns TerminalWidgets, spawns tabs]
-    end
-    TW[Tool window right<br/>stripe button Claude Aside] --> F
-    F --> S
-    S --> R[LocalTerminalDirectRunner<br/>terminal plugin API]
+graph TD
+    A[Harness Process in Terminal] -->|HTTP POST /status?state=...| B[Embedded HttpServer in IDE]
+    B -->|EDT invokeLater| C[HarnessStatusManager]
+    C -->|Update Icon & Title| D[Tool Window Stripe Button & Tab]
 ```
 
-- **`ClaudeToolWindowFactory`** — registered in `plugin.xml`; on first open asks the
-  service for a terminal tab. Nothing runs until the user clicks the button
-  (no `postStartupActivity`).
-- **`ClaudeTerminalService`** (project service) — creates `TerminalWidget`s with
-  `sendCommandToExecute("claude -c")`, registers them as `Content`s, disposes on
-  project close. Single place that future features (tabs, states) extend.
+---
 
-That is the whole MVP: two files, no session logic (see the `-c` fallback above).
+## 4. Logika "Tylko JEDNA karta" i Wybór Harnessu
 
-Later phases add: `ClaudeSessions` (path encoding + session lookup, needed only to
-locate hook state files), `ClaudeStateWatcher` and title-bar actions — all hanging off
-the same service.
+Wymóg posiadania maksymalnie jednej aktywnej karty realizowany jest poprzez prostą maszynę stanów w Tool Window:
+
+```
+[ Brak aktywnej sesji ] ──► Widok wyboru (Launcher Panel)
+                                │
+                                ├── Kliknięcie "Claude Code"
+                                ├── Kliknięcie "Antigravity CLI"
+                                └── Kliknięcie "OpenCode CLI"
+                                │
+                                ▼
+[ Aktywna sesja ]       ──► Widok Terminala (Dokładnie 1 Content)
+                                │
+                                └── Pasek narzędzi (Toolbar):
+                                      [Przełącz / Zakończ sesję] ──► Powrót do Launchera
+```
+
+### 1. Widok Launchera (Empty State):
+- Panel Swing z 3 estetycznymi kafelkami/przyciskami:
+  - 🟠 **Claude Code** (`claude -c`)
+  - 🔵 **Antigravity CLI** (`agy`)
+  - 🟣 **OpenCode CLI** (`opencode`)
+- Opcja: checkbox "Wznów ostatnią sesję" / "Pamiętaj wybór dla projektu".
+
+### 2. Obsługa pojedynczej karty (`ContentManager`):
+- Po wybraniu harnessu zawartość okna jest zastępowana przez widget terminala.
+- Flaga `content.isCloseable = true`: zamknięcie karty niszczy proces i przywraca widok launchera.
+- Dodatkowy przycisk na pasku narzędzi (Tool Window Header Action): "Switch Harness" / "Reset Session", który pozwala bezpiecznie zakończyć obecną sesję i wrócić do wyboru.
 
 ---
 
-## Feasibility of requested features
+## 5. Animowane Ikonki i Stany Agenta
 
-| # | Feature | Feasibility | Notes |
+IntelliJ SDK posiada wbudowane wsparcie dla animowanych ikon: `com.intellij.ui.AnimatedIcon`.
+
+- **Wydajność:** `AnimatedIcon` wstrzymuje renderowanie i odświeżanie klatek w momencie, gdy Tool Window jest ukryte lub zminimalizowane, dzięki czemu nie marnuje zasobów w tle.
+- **Stany do obsłużenia:**
+  - `IDLE`: Statyczna ikonka wybranego harnessu (lub zielona kropka).
+  - `THINKING` / `GENERATING`: `AnimatedIcon.Default` (subtelny spinner JetBrains) lub animowany pierścień w barwach danego harnessu.
+  - `EXECUTING_TOOL`: Animowana zębatka lub pulsująca ikonka narzędzia.
+  - `WAITING_PERMISSION` / `INPUT`: Statyczna pomarańczowa ikonka uwagi / dzwonka (z opcją desktop notification).
+  - `ERROR`: Czerwony wykrzyknik.
+
+---
+
+## 6. Zescope'owanie poszczególnych Harnessów
+
+Każdy z trzech harnessów ma inny mechanizm rozszerzeń i raportowania zdarzeń:
+
+| Cecha | Claude Code | Antigravity CLI (`agy`) | OpenCode CLI (`opencode`) |
 |---|---|---|---|
-| 0 | Right-docked terminal auto-running Claude with resume | **Easy** | everything verified above |
-| 1 | Multiple Claude terminals as tabs | **Easy** | `ContentManager.addContent` per widget + a `+` title action |
-| 2 | Dropdown of open Claude sessions | **Easy–Medium** | multiple contents already give the built-in tab list; a custom dropdown = `ToolWindow.setTitleActions` with a popup action group |
-| 3 | Status icons (thinking / finished / awaiting approval) | **Medium–Hard** | cheap 80% first: `TerminalWidget.isCommandRunning()` + `addTerminationCallback()` give running/idle for free, no hooks. Full states need more — the terminal is a dumb pty, state is not observable from output reliably. Robust path: **Claude Code hooks** (`Stop`, `Notification`, `PreToolUse`) writing a tiny state file per session; plugin watches it (NIO `WatchService` or VFS listener) and swaps the tool window icon (`ToolWindow.setIcon`) / tab icons. Requires the plugin to install hook entries into `.claude/settings.json` (ask first). Parsing terminal output = fragile, rejected. |
-| 4 | JetBrains MCP | **Medium** | 2025.2+ ships a built-in MCP server (Settings → Tools → MCP Server). Plugin's job is only config glue: detect the server port, run `claude mcp add` (or write `.mcp.json`) so Claude gets IDE tools. Also note: the official *Claude Code [Beta]* JetBrains plugin provides `/ide` integration (diffs, selection context) and coexists with ours — ours owns *where the terminal lives*, theirs owns editor integration. Verify interop early. |
-
-### Additional ideas (5)
-
-- **"New session" / "Resume…" title actions** — `+` runs `claude`, clock icon runs `claude -r`.
-- **Send selection to Claude** — editor context menu action that pastes
-  `@file#Lx-Ly`-style reference (or the selected text) into the active Claude terminal
-  via `sendCommandToExecute` without newline. Cheap, high value.
-- **Notification balloon when Claude awaits approval while the tool window is hidden**
-  (builds on the same hook/state mechanism as #3).
-- **Focus shortcut** — an action + editable keybinding to jump editor ↔ Claude terminal.
-- **Per-worktree working dir** — if the project has git worktrees, let a new tab pick one.
+| **Główna komenda** | `claude` (`claude -c`) | `agy` | `opencode` |
+| **Mechanizm zdarzeń** | Hooks w `.claude/settings.json` | Hooks w `.agents/hooks.json` | Pluginy JS/TS w `.opencode/plugins/` |
+| **Wspierane cykle życia** | `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `Notification` | `PreInvocation`, `PreToolUse`, `PostToolUse`, `PostInvocation`, `Stop` | `session.status`, `session.idle`, `toolExecuted` |
+| **Sposób powiadamiania** | Shell command (`curl` do IDE) | Shell command w `hooks.json` | Native `fetch()` w pluginie Node/Bun |
 
 ---
 
-## Development phases
+### A. Claude Code
 
-### Phase 1 — MVP (the whole original problem)
-- [x] Tool window `Claude Aside`, `anchor="right"`, 13×13 SVG icon (mono, per IJ guidelines)
-- [x] `ClaudeTerminalService`: one terminal tab, working dir = project root, `sendCommandToExecute("claude -c")`
-- [x] Manual test in `runIde` sandbox + real install into PyCharm/IntelliJ (WSL shell)
-
-No unit tests in this phase — after dropping the session lookup there is no pure logic
-left to test; everything is IDE wiring that only a manual run exercises.
-
-**Done when:** one click → Claude with the last session, bottom terminals untouched.
-
-### Phase 2 — Tabs & actions
-- [x] `+` (new session), `Resume…` (bare `claude -r` — its built-in picker beats
-      re-implementing a session list in Swing), restart-tab action
-- [x] Multiple contents with sensible tab titles; dispose kills the pty
-- [x] Send-selection-to-Claude editor action
-
-### Phase 3 — Status
-- [x] `ClaudeSessions`: path encoding (non-alphanumeric → `-`) + `*.jsonl` lookup
-      (unit-tested — the only pure logic in the plugin)
-- [x] Hook installer (writes `UserPromptSubmit`/`Notification`/`Stop` entries into project
-      `.claude/settings.json`, with user consent). Uses `UserPromptSubmit`→thinking rather
-      than `PreToolUse` — same "busy" signal, no tool-name matcher needed. Command is a
-      portable POSIX write to `$CLAUDE_PROJECT_DIR/.claude/aside-status`.
-- [x] State file watcher (NIO `WatchService`) → tool-window icon variants + tab icons
-      (coloured circles: amber=thinking, orange=waiting, green=idle)
-- [x] Balloon on "awaiting approval" when window hidden
-
-> On a native Windows shell the POSIX hook command is a no-op, so status stays on the
-> default glyph there; targets WSL/macOS/Linux/Git-bash.
-
-Manual testing then surfaced three problems, all fixed in Phase 3.1: one status file per
-*project* meant two tabs stomped on the same dot; Ctrl+C left the indicator stuck on
-`thinking` because `Stop` only fires on a normal end-of-turn; and denying a permission
-prompt left it stuck on `waiting` because no hook fires on the *answer*.
-
-### Phase 3.1 — Status correctness fixes
-
-**More facts (verified against `claude` 2.1.229 and the hooks reference):**
-
-| Fact | Detail |
-|---|---|
-| `claude --session-id <uuid>` | starts a session under an id the caller picks — removes all session-id guessing |
-| Hook stdin payload | every event carries `session_id`, `cwd`, `transcript_path`, `hook_event_name` as JSON on stdin |
-| `PermissionRequest` hook | fires exactly when a tool call needs a permission decision (a plain command hook can't alter the decision — exit 2 is not honoured there) |
-| `Pre`/`PostToolUse` hooks | bracket each tool call; `PostToolUse` is what makes an *approved* tool return the tab to `thinking` |
-| Interrupts fire **no** hook | Ctrl+C and Esc-denying a permission prompt are invisible to hooks — confirmed in the reference and by testing |
-| …but they are recorded | Claude appends a `type:"user"` transcript entry reading `[Request interrupted by user]` (or `…for tool use]` for a denied tool) — verified in real `~/.claude/projects/*/*.jsonl` files on this machine |
-
-- [x] Per-tab status: every tab is launched with a **known** session id — `--session-id
-      <uuid>` for a new session, `-r <id>` for a resumed one — instead of bare `claude -c`,
-      which picks a session without saying which. Hooks write
-      `.claude/aside-status/<session-id>`, tabs carry their own dot icon, and the stripe
-      button shows the most urgent state across tabs (waiting > thinking > idle)
-- [x] Reset to idle on interrupt: the plugin tails each open tab's transcript and treats a
-      trailing `[Request interrupted by user…]` record as "back to idle", applying each
-      record once (keyed by its entry uuid). Rejected the alternatives — a stale-status
-      timeout guesses wrong during long thinking, and `addTerminationCallback` only fires
-      when the whole pty dies, not when a turn is cut short
-- [x] Reset to idle when the user denies a permission prompt: same mechanism — a denial is
-      recorded as `[Request interrupted by user for tool use]`. Added `PermissionRequest` →
-      `waiting` and `Post`/`PreToolUse` → `thinking` so an *approved* tool also recovers,
-      which the `Notification`→`Stop` pair alone never did
-- [x] Manual test — half of it superseded by Phase 3.2. "Two tabs each showing their own
-      status" stopped being something the plugin does once per-tab dots were dropped. The
-      surviving half — Ctrl+C during a tool call and a denied permission prompt both
-      return to idle — is what Phase 3.4 implements and tests
-
-> Upgrading needs one click: **⚙ → Reinstall Status Indicator Hooks**. Install now writes a
-> generated `.claude/aside-status.sh` (POSIX, `sed` not `jq`, so no extra dependency on
-> macOS or Git-bash) and *replaces* entries from older plugin versions instead of appending
-> to them. The script is exercised by a unit test that runs it through a real `sh`.
-
-**Was a limitation, fixed in Phase 3.5:** the transcript tail is read from
-`~/.claude/projects/<encoded>/`, which under WSL is neither the IDE's `$HOME` nor the
-IDE's project path.
-
-### Phase 3.2 — One animated icon instead of per-tab dots
-
-Per-tab dots were a dead end. `Content.setIcon` alone paints nothing on a tool-window tab:
-the platform needs the opt-in `ToolWindow.SHOW_CONTENT_ICON` (`Key<Boolean>`, verified in
-`app-client.jar` of IC-2025.2.6). Even opting in, a single tab shows no tab strip at all,
-so the common case was still one dot. Dropped the idea rather than fight it.
-
-- [x] **One button, one state — the first open tab's.** Extra tabs still open and run, they
-      just don't drive the icon; when the first tab closes the next-oldest takes over
-- [x] **Three looks, no compositing.** No glyph-plus-dot layering; each state is its own
-      artwork, all generated from the one glyph by `tools/generate-icons.sh`:
-      | State | Look |
-      |---|---|
-      | idle / unknown | glyph centred, still |
-      | thinking | glyph walks — slides off the right edge, re-enters from the left (painted twice a width apart so the button is never empty) |
-      | waiting | glyph upside down, rocking side to side so its legs kick |
-- [x] **Always white.** The glyph no longer uses Claude orange (`#D97757`), and the
-      `_dark` variant is gone — one file, one colour, both themes
-- [x] Manual test: walking loop is smooth and never blank; kicking reads as kicking;
-      icon returns to still-and-centred when Claude finishes
-
-> **Frames must be real icon files.** The first attempt kept one SVG and derived each frame
-> at paint time from a custom `javax.swing.Icon` applying `Graphics2D` transforms. On a
-> tool-window button that renders at the wrong size and throws — the icon visibly shrank to
-> a frozen, clipped frame and the IDE raised an error balloon. `tools/generate-icons.sh`
-> now bakes 12 walk + 8 kick frames into SVGs loaded through `IconLoader`, the same path as
-> every icon that has ever worked here. `ClaudeStatusService` also stops the loop and falls
-> back to the still glyph if a frame ever fails to paint, so a decoration can't keep
-> throwing at the user.
->
-> Frames are pushed with `ToolWindow.setIcon` on a ~14 fps Swing timer. The tidier-looking
-> `com.intellij.ui.AnimatedIcon` was rejected: it repaints through the component it is
-> painted on (unverified for stripe buttons) and is `@ApiStatus.Experimental`, whereas
-> `setIcon` is already proven to repaint here.
->
-> White-on-white is a real risk in light themes — revisit if the button ever disappears.
-
-### Phase 3.3 — Interrupt detection actually fires, and a test suite
-
-The Ctrl+C reset never worked, and the reason was an assumption, not a race: the code
-asked "is the newest transcript line an interrupt?". Claude appends bookkeeping records
-(`system`, `last-prompt`, `total_tokens_reminder`) within *milliseconds* of the interrupt,
-so the interrupt is almost never last. Verified by timestamping real interrupts in this
-project's own transcript — the record itself lands promptly, but is immediately buried.
-
-- [x] Scan the whole read tail for the newest interrupt (`ClaudeSessions.lastInterruptUuid`)
-      instead of testing only the final line
-- [x] Baseline on tab open: the first read of a session records its existing interrupts
-      without acting, so resuming a conversation full of old ones doesn't read as "Claude
-      just stopped". Only a change afterwards resets the icon
-- [x] **Poll** the transcript every 700 ms while the icon animates, instead of watching the
-      directory. An interrupt is only possible while Claude is busy, so the cost is one
-      tail read a second and only then; it also sidesteps the question of whether a
-      directory watch reports appends to a file another process holds open
-- [x] Test suite — 55 tests, no skips:
-      | Suite | Covers |
-      |---|---|
-      | `ClaudeStatusStateTest` | first tab owns the button, promotion on close, per-session interrupt baselines, when a balloon is due |
-      | `ClaudeSessionsTest` | path encoding, session lookup, interrupt parsing incl. the bug above |
-      | `ClaudeStatusHooksTest` | settings.json merge, upgrade from old entries, foreign hooks preserved, plus the reporter script executed through a real `sh` |
-      | `ClaudeStatusIconsTest` | frame naming and wrap-around, every frame file present, frames are white |
-      | `ClaudeLaunchTest` | launch commands always name a session id |
-      | `ClaudeStatusTest` | status words round-trip with what the script writes |
-
-> Testability drove three small refactors: `ClaudeStatusHooks` takes a directory rather than
-> a `Project`, the button's rules moved into a plain `ClaudeStatusState`, and launch
-> commands became a `ClaudeTerminalService.Launch` value. What remains untested is the raw
-> IDE wiring — creating terminal widgets, setting the tool-window icon — which needs a
-> running IDE rather than a unit test.
-
-### Phase 3.4 — The keystroke, not the transcript
-
-Ctrl+C during a turn still left the icon walking. Measuring the transcripts settled why —
-two independent faults, both found by counting real records rather than reasoning:
-
-| Measured | Consequence |
-|---|---|
-| A test session where Ctrl+C was pressed ends with a normal `stop_hook_summary` and **no interrupt record at all**. Of five genuine interrupts in this project's main transcript, the recent ones are all `…for tool use` | Interrupting a *tool call* is recorded; interrupting plain thinking often is not. The transcript cannot be the only signal |
-| Matching the bare phrase found **27** interrupts where **5** were real — the rest were the assistant's own tool calls grepping for it and test files containing it | The detector was firing on records that merely *mention* an interrupt |
-
-**There is no interrupt hook — measured, not assumed.** Each interrupt's nearest following
-`stop_hook_summary` is minutes later and belongs to the *next* turn (22:47:58 → 22:50:33;
-23:20:21 → 23:24:35), so `Stop` does not fire when a turn is cut short. The documented
-event list, down to `TeammateIdle` and `WorktreeCreate`, has nothing for interrupt or
-cancel either. The keystroke is the only immediate evidence there is.
-
-- [x] **Watch the keystroke.** The plugin owns the terminal, so Ctrl+C and Esc pressed in a
-      Claude tab put it back to idle at once. No hook, no transcript, no polling delay.
-      Optimistic by design: if Claude was in fact still working, its next
-      `Pre`/`PostToolUse` hook puts the animation back within moments.
-      Listens via `Toolkit.addAWTEventListener` rather than an `IdeEventQueue` dispatcher —
-      the lowest level the key can be seen at, before the IDE routes it — and accepts the
-      key either when it comes from inside the tab's component tree *or* while the Claude
-      tool window is the active one, since the terminal can host its editor outside that
-      tree
-- [x] **Gear menu → Diagnose Status Indicator.** The indicator spans a shell script, a file
-      watcher, a transcript and a key listener; when one goes quiet nothing is visible.
-      The action reports tracked tabs, the first tab's session, the status on disk, whether
-      hooks are installed, and when an interrupt key was last seen — turning "the icon is
-      wrong" into a named broken link
-- [x] **Anchor the marker to its field.** `"text":"[Request interrupted by user` — real
-      records carry it unescaped, records *about* one nest the quotes a level deeper
-      (`\"text\":\"…`). That single anchor is the difference between 27 matches and 5
-- [x] **Re-baseline when a busy stretch starts**, so the record Claude writes for an
-      interrupt the keyboard watcher already handled can't blank the icon during the *next*
-      turn
-- [x] 62 tests, no skips (`ClaudeInterruptKeysTest` plus regressions for both faults above)
-
-> Esc doubles as "interrupt" and as the terminal's focus-editor key; treating it as an
-> interrupt is deliberate, since denying a permission prompt is an Esc. The cost of a false
-> positive is a briefly still icon, which the next hook corrects.
-
-### Phase 3.5 — WSL projects
-
-The Risks table had flagged this as Phase 3 work, and Phase 3 shipped without it. Under WSL
-*two* things disagree, and translating one without the other still finds nothing:
-
-| The IDE says | Claude, inside the distro, uses |
-|---|---|
-| project `//wsl$/Debian/home/me/proj` | `/home/me/proj`, encoded `-home-me-proj` |
-| `$HOME` = `C:\Users\me` | the distro's `/home/me`, i.e. `//wsl$/Debian/home/me/.claude` |
-
-- [x] `ClaudeSessions.storage()` returns the pair Claude would use, and `sessionsDir` runs
-      everything through it — so `latestSessionId` and the transcript tail were both fixed
-      by one change. Handles the `wsl$` and `wsl.localhost` spellings, either slash, any casing
-- [x] Falls back to the IDE's own values when the home cannot be derived from the path
-      (anything outside `/home/<user>` and `/root`). Guessing a home would be worse than
-      today's "finds nothing"
-- [x] 9 tests; 71 total, no skips
-- [x] Confirmed against the real thing rather than reasoned about: `pwd` in a WSL tab reads
-      `/home/mbejnar/thesis`, and `\\wsl$\Debian\home\mbejnar\.claude\projects\`
-      holds `-home-mbejnar-thesis` with 5 transcripts — exactly the path this builds
-
-> What was *not* broken under WSL: the hook-driven states. `.claude/aside-status/` lives
-> inside the project, so it is reached over the UNC path like any other file. Only the two
-> features reading `~/.claude/projects` — resume-on-open and interrupt detection — were
-> silently dead.
-
-### Phase 3.6 — Watching a filesystem that never reports
-
-With the paths fixed, WSL still showed a still icon while the hooks were writing
-`thinking`. *Diagnose Status Indicator* named the broken link in one line: `Status file:
-thinking` next to `Status the button shows: idle`. The file was right, the notification was
-missing.
-
-| Measured | Consequence |
-|---|---|
-| NIO `WatchService` registers without error on `\\wsl$\...` and then never fires | On Windows it is backed by `ReadDirectoryChangesW`, which reports nothing for the distro's 9P share. The status was applied once, at startup, and never again |
-
-- [x] **Poll instead of watch**, every 500 ms. One code path for every filesystem, at the
-      cost of a listing and a short read twice a second over a directory holding one file
-      per open tab
-- [x] **Report changes, not contents.** The first polling version re-applied whatever the
-      file said on every tick, which broke Ctrl+C outright: no hook fires on an interrupt,
-      so the file still reads `thinking` while the button is correctly idle, and half a
-      second later the poll put the animation straight back. The scan now remembers each
-      file's mtime *and* contents — mtime too, because a new turn rewrites the same word
-      `thinking` and that rewrite has to count as a change
-- [x] Deletions are found by diffing against the previous scan, which `ENTRY_DELETE` used
-      to cover
-- [x] Confirmed by hand on both a Windows project and a WSL one: animation runs, waiting
-      for approval shows, Ctrl+C returns to the still glyph
-
-> Not covered: after an interrupt the state file keeps saying `thinking` until Claude's
-> next hook. Restarting the IDE in that window starts the animation against an idle Claude.
-> Writing `idle` from the key listener would close it, at the price of the keyboard handler
-> writing into project files.
-
-### Phase 3.7 — The IDE froze, and it was not our code
-
-PyCharm went sluggish. `PerformanceWatcher` had already written the evidence: **97 UI
-freezes totalling 621 s in one 4h20 session**, average 6.4 s. The plugin appears in the
-coroutine-scope registry of 99 of those 100 thread dumps and in the actual stack of none.
-
-The dumps all have one shape — a three-way lock cycle inside the classic terminal:
-
-| Thread | Holds | Waits for |
-|---|---|---|
-| `TerminalEmulator-Local` | the `TerminalTextBuffer` lock | the IDE's hyperlink filters, via a blocking `CompletableFuture.get()` in `TextProcessing.applyFilter` |
-| `JediTerminal Filters` | — | that same buffer lock, via `TextProcessing$LineInfoImpl.getLine` |
-| EDT | — | that same buffer lock, painting `TerminalPanel` |
-
-Nothing breaks the cycle but the emulator's own timeout, which is why 81 of 100 freezes
-lasted exactly 6 s. The frame above `applyFilter` was `JediTerminal.setLinkUriStarted` in
-**99 of 99** dumps: every single one was triggered by an OSC 8 hyperlink in Claude's output.
-
-- [x] **`FORCE_HYPERLINK=0`** in the tab's environment. Claude honours it — the bundled
-      `supportsHyperlink` reads `!(r.length > 0 && parseInt(r, 10) === 0)` — and without
-      OSC 8 the jediterm path is never entered. The cost is that URLs in Claude's output
-      print as plain text
-- [x] **`WSLENV=…:FORCE_HYPERLINK/u`** alongside it: with the IDE on Windows and Claude in
-      a distro the variable is set on `wsl.exe`, and only names listed there cross over.
-      Verified by hand through `wsl.exe -e sh -c 'printf %s "$FORCE_HYPERLINK"'`. Whatever
-      the user already forwarded is kept, and the platform appends its own names to ours
-      rather than overwriting
-
-Measured while here, and trimmed in the same pass:
-
-- [x] The status poll ran every 500 ms for the life of the project **even with no tab open**
-      — 0.2 ms a scan locally but 6.2 ms over `\\wsl$`. It now skips when nothing is tracked
-- [x] The interrupt poll re-read a 64 KB transcript tail every 700 ms while animating, 14 ms
-      each over `\\wsl$`, plus the garbage. It now stats size and mtime first and skips the
-      read when the file has not moved — which is exactly the case while Claude sits on an
-      approval prompt, the longest stretch of animation there is
-- [x] Animation dropped from 70 ms to 100 ms per frame. Every frame is EDT work: `setIcon`
-      repaints the stripe button and refreshes the activate action's presentation
-- [x] `RestartClaudeTabAction` and `RemoveClaudeTabAction` moved to `ActionUpdateThread.BGT`.
-      Their `update` reads one `contentCount`, and the log showed `1603 ms to grab EDT for
-      RemoveClaudeTabAction#presentation` — a symptom of the freezes, but no reason to be
-      queued behind them
-
-> The real fix is the Reworked terminal engine, which has no `TextProcessing` at all. The
-> plugin hardcodes `LocalTerminalDirectRunner`, i.e. **classic**, so changing Terminal
-> Engine in Settings does not reach our tab. Moving over means the `terminalWidgetProvider`
-> EP plus internal session wiring — deliberately left for a separate decision.
-
-### Phase 4 — MCP & polish
-- [ ] Auto-configure JetBrains MCP server for Claude
-- [ ] Focus shortcuts, settings page (claude binary path, default flags)
-
-Each phase ships independently; stop whenever it's good enough.
+Claude Code wspiera deklaratywne hooki w `~/.claude/settings.json` lub `.claude/settings.json`:
+- **Zdarzenia:**
+  - `UserPromptSubmit`: agent rozpoczyna pracę (`THINKING`)
+  - `PreToolUse`: agent wykonuje narzędzie (`EXECUTING_TOOL`)
+  - `PostToolUse`: zakończenie narzędzia (`THINKING`)
+  - `Stop` / `SessionEnd`: zakończenie odpowiedzi (`IDLE`)
+  - `Notification`: oczekiwanie na decyzję użytkownika (`WAITING_PERMISSION`)
+- **Implementacja w hooku:**
+  ```json
+  {
+    "hooks": {
+      "UserPromptSubmit": [{ "type": "command", "command": "curl -s -X POST http://127.0.0.1:$HARNESS_IDE_PORT/status?state=thinking" }],
+      "PreToolUse": [{ "type": "command", "command": "curl -s -X POST http://127.0.0.1:$HARNESS_IDE_PORT/status?state=tool" }],
+      "Stop": [{ "type": "command", "command": "curl -s -X POST http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle" }]
+    }
+  }
+  ```
 
 ---
 
-## Risks & open questions
+### B. Antigravity CLI (`agy`)
 
-| Risk | Mitigation |
-|---|---|
-| Terminal APIs churn (Block/gen2 terminal rework ongoing; `AbstractTerminalRunner` may deprecate) | narrow in practice: `startShellTerminalWidget` is the *only* non-deprecated widget-creation path left on that class, i.e. the one JetBrains migrated to itself. Pin `sinceBuild=252`; revisit on IDE upgrade |
-| WSL: IDE-visible project path (`\\wsl$\...`) vs Linux path used in `~/.claude/projects` encoding | **done in Phase 3.5** — `ClaudeSessions.storage` translates both the path and the home; a no-op if the IDE runs inside WSL. Residual: a distro project outside `/home/<user>` or `/root` still cannot be located |
-| `claude` not on PATH of the shell the IDE spawns | Phase 1: rely on shell rc files (login shell); Phase 4: settings field for binary path |
-| Hook-based state detection depends on Claude Code hook config format staying stable | keep the hook payload trivial (touch a file); feature degrades gracefully to "no status icons" |
-| Official Claude Code JetBrains plugin may add its own tool window later | ours is still the only one giving *terminal-in-right-dock*; re-evaluate overlap when it happens |
+Antigravity posiada system cyklu życia definiowany w `.agents/hooks.json` (lub w pluginach Antigravity):
+- **Zdarzenia:**
+  - `PreInvocation`: model został wywołany (`THINKING`)
+  - `PreToolUse`: uruchomienie narzędzia (`EXECUTING_TOOL`)
+  - `PostToolUse` / `PostInvocation`: powrót do pętli decyzyjnej
+  - `Stop`: zakończenie pętli wykonawczej (`IDLE`)
+- **Kontrakt:** Hook otrzymuje na stdin JSON z metadanymi i oczekuje JSON-a na stdout.
+- **Implementacja w `.agents/hooks.json`:**
+  ```json
+  {
+    "ide-status": {
+      "PreInvocation": [{ "type": "command", "command": "curl -s -X POST http://127.0.0.1:$HARNESS_IDE_PORT/status?state=thinking" }],
+      "PreToolUse": [{ "matcher": "*", "hooks": [{ "command": "curl -s -X POST http://127.0.0.1:$HARNESS_IDE_PORT/status?state=tool" }] }],
+      "Stop": [{ "type": "command", "command": "curl -s -X POST http://127.0.0.1:$HARNESS_IDE_PORT/status?state=idle" }]
+    }
+  }
+  ```
 
 ---
 
-## References
+### C. OpenCode CLI (`opencode`)
 
-- [Tool Windows — IntelliJ Platform SDK](https://plugins.jetbrains.com/docs/intellij/tool-windows.html)
-- [Claude Code CLI reference](https://docs.anthropic.com/en/docs/claude-code/cli-reference) (`-c`, `-r`, hooks)
-- [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks)
-- Terminal plugin sources: [intellij-community/plugins/terminal](https://github.com/JetBrains/intellij-community/tree/master/plugins/terminal)
+OpenCode opiera się o ekosystem pluginów JS/TS ładowanych z `.opencode/plugins/` lub konfigurowanych w `opencode.jsonc`:
+- **Zdarzenia:**
+  - `session.status`: zmiana statusu sesji
+  - `session.idle`: przejście w stan spoczynku
+  - zdarzenia wykonania narzędzi
+- **Implementacja pluginu OpenCode (`.opencode/plugins/intellij-bridge.js`):**
+  Zero dodatkowych zależności (wykorzystuje natywny `fetch` środowiska Node/Bun):
+  ```javascript
+  export default {
+    id: "intellij-bridge",
+    setup(ctx) {
+      const port = process.env.HARNESS_IDE_PORT;
+      if (!port) return;
+
+      const notify = (state) => {
+        fetch(`http://127.0.0.1:${port}/status?state=${state}`).catch(() => {});
+      };
+
+      ctx.event.subscribe((event) => {
+        if (event.type === "session.idle") notify("idle");
+        else if (event.type === "session.status") notify("thinking");
+      });
+    }
+  };
+  ```
+
+---
+
+## 7. Dystrybucja hooków (Zero-Config dla użytkownika)
+
+Aby użytkownik nie musiał ręcznie konfigurować plików JSON/JS w każdym projekcie:
+1. **Wspólny katalog mostka pluginu:**
+   - Plugin IntelliJ tworzy w swoim katalogu cache (np. `~/.config/harness-aside/hooks/` lub tymczasowym w projekcie) zestaw lekkich skryptów powiadamiających.
+2. **Automatyczna inicjalizacja:**
+   - Przed uruchomieniem terminala plugin sprawdza i dopisuje reguły do konfiguracji projektu (`.claude/`, `.agents/`, `.opencode/`), lub:
+   - Wstrzykuje flagi konfiguracyjne do powłoki/procesu, wskazujące na globalne konfiguracje dostarczone przez plugin.
+
+---
+
+## 8. Scoping i Plan Prac (Krok po Kroku)
+
+### Zadanie 1: Rebranding i Architektura UI (Karty i Launcher)
+- [x] Zmiana nazwy i identyfikatorów (`harness-aside`, `Harness Aside`, `com.github.baenar.harnessaside`).
+- [ ] Implementacja widoku `LauncherPanel` (estetyczny wybór Claude Code, Antigravity CLI, OpenCode CLI).
+- [ ] Zapewnienie ścisłej reguły 1 aktywnej karty w `ToolWindowContentManager`.
+- [ ] Dodanie akcji na pasku narzędzi: *Switch Harness* (zamknięcie aktywnego procesu i powrót do launchera).
+
+### Zadanie 2: Lightweight Status Bridge (Mikroserwer HTTP)
+- [ ] Implementacja serwera `HarnessStatusServer` (użycie standardowego `com.sun.net.httpserver.HttpServer` z JDK, powiązanego z cyklem życia `Disposable` projektu).
+- [ ] Przekazywanie `HARNESS_IDE_PORT` (oraz opcjonalnego tokenu) do środowiska terminala w `ShellStartupOptions.Builder().env(...)`.
+- [ ] Endpoint `POST /status?state=...` aktualizujący stan na wątku EDT (`ApplicationManager.getApplication().invokeLater`).
+
+### Zadanie 3: System Animowanych Ikon
+- [ ] Przygotowanie zestawu ikon SVG dla każdego harnessu + ikon stanu (`IDLE`, `THINKING`, `TOOL`, `INPUT`, `ERROR`).
+- [ ] Podpięcie `AnimatedIcon` pod nagłówek karty oraz ikonę okna w pasku bocznym (Stripe button).
+
+### Zadanie 4: Integracja Hooków dla Harnessów
+- [ ] Przygotowanie szablonów hooków dla Claude Code (`.claude/settings.json`).
+- [ ] Przygotowanie konfiguracji hooków dla Antigravity CLI (`.agents/hooks.json`).
+- [ ] Przygotowanie wbudowanego pluginu dla OpenCode (`.opencode/plugins/intellij-bridge.js`).
+- [ ] Automatyczna weryfikacja/instalacja mostka statusów przy starcie wybranego harnessu.

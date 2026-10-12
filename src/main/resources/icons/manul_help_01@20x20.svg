@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mn mn4 mn4-help" color="#6C707E" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6C707E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Manul potrzebuje pomocy (klatka 1)">
+<g transform="translate(0.7, 0)">
+<path stroke="#6C707E" fill="none" d="M3.5 10C3 7.5 4.5 5.5 6.5 5.5C8 5.5 9 6.5 9.5 8Q12 7.4 14.5 8C15 6.5 16 5.5 17.5 5.5C19.5 5.5 21 7.5 20.5 10L22 12.5L20.8 14L21.8 16.5L19.5 17.2Q12 21.5 4.5 17.2L2.2 16.5L3.2 14L2 12.5Z"/>
+<path stroke="#6C707E" stroke-width="1.5" fill="none" d="M5.4 14.4L6.6 16.4M18.6 14.4L17.4 16.4"/>
+<circle cx="8" cy="11.5" r="1.8" fill="#6C707E" stroke="none"/>
+<circle cx="16" cy="11.5" r="1.8" fill="#6C707E" stroke="none"/>
+<path stroke="#6C707E" fill="#6C707E" stroke-width="1.2" d="M11 14h2l-1 1z"/>
+<path stroke="#6C707E" stroke-width="1.4" fill="none" d="M12 15.4Q11.2 16.6 10 16M12 15.4Q12.8 16.6 14 16"/>
+</g>
+<g class="bang">
+<path stroke="#6C707E" fill="none" d="M12 .9V2.4"/>
+<circle cx="12" cy="4.4" r=".9" fill="#6C707E" stroke="none"/>
+</g>
+</svg>

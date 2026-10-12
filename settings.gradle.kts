@@ -1,6 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 
-rootProject.name = "claude-aside"
+rootProject.name = "harness-aside"
 
 pluginManagement {
     plugins {
