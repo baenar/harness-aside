@@ -18,11 +18,30 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
 
+  pre_job:
+    name: Check for duplicate runs
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          skip_after_successful_duplicate: 'true'
+          concurrent_skipping: 'same_content'
+          cancel_others: 'true'
+
   build:
     name: Build
+    needs: [ pre_job ]
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Maximize Build Space
@@ -55,7 +74,8 @@ jobs:
 
   test:
     name: Test (${{ matrix.os }})
-    needs: [ build ]
+    needs: [ pre_job, build ]
+    if: needs.pre_job.outputs.should_skip != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -109,6 +129,8 @@ jobs:
 
   icons:
     name: Icons match their generator
+    needs: [ pre_job ]
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Fetch Sources
@@ -127,7 +149,8 @@ jobs:
 
   verify:
     name: Verify plugin
-    needs: [ build ]
+    needs: [ pre_job, build ]
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Maximize Build Space
