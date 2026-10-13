@@ -1,5 +1,6 @@
 package com.github.baenar.harnessaside.core
 
+import com.github.baenar.harnessaside.antigravity.AntigravityHarness
 import com.github.baenar.harnessaside.claude.ClaudeHarness
 
 /**
@@ -11,6 +12,7 @@ object HarnessRegistry {
 
     private val harnesses = mutableMapOf<String, Harness>(
         ClaudeHarness.id to ClaudeHarness,
+        AntigravityHarness.id to AntigravityHarness,
     )
 
     /** All currently registered harnesses. */

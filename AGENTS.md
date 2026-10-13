@@ -23,10 +23,15 @@
 * **Session Storage Discovery (`ClaudeSessions`)**: Automatically resolves Claude session paths and transcripts across Linux, native Windows, and WSL environments (translating Windows UNC paths such as `\\wsl$\` and `\\wsl.localhost\`).
 * **Interrupt Detection (`ClaudeInterruptKeys`)**: Detects interrupt signals (e.g., Ctrl+C) to reset the status icon back to idle.
 
+### Antigravity CLI Harness Integration
+* **CLI Execution (`AntigravityHarness`)**: Launches Antigravity CLI sessions (`agy`) inside the dedicated terminal tool window using the Antigravity brand icon.
+* **Push-Based Hook Configuration (`AntigravityStatusHooks`)**: Generates and merges lifecycle hooks into global `~/.gemini/config/hooks.json` (`SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `Stop`) with guarded curl status webhooks.
+* **Interrupt Detection**: Wires terminal interrupt signals (Ctrl+C) via `HarnessStatusManager` to reset status icons back to idle.
+
 ### Push-Based Status Server (`HarnessStatusServer`)
 * **Localhost Loopback Server**: An embedded HTTP server built on the standard JDK `com.sun.net.httpserver.HttpServer`, bound to `127.0.0.1` on an ephemeral port.
-* **Environment Injection**: Injects `HARNESS_IDE_PORT` and an ephemeral `HARNESS_IDE_TOKEN` into the terminal shell environment at startup.
-* **Automatic Hook Configuration (`ClaudeStatusHooks`)**: Merges lightweight HTTP webhook hooks into `.claude/settings.json`, triggering on events (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `Notification`, etc.).
+* **Environment Injection**: Injects `HARNESS_ASIDE_IDE_PORT` and an ephemeral `HARNESS_ASIDE_IDE_TOKEN` (with backwards-compatible `HARNESS_IDE_PORT` / `HARNESS_IDE_TOKEN` fallbacks) into the terminal shell environment at startup.
+* **Automatic Hook Configuration (`ClaudeStatusHooks`)**: Merges lightweight HTTP webhook hooks into global `~/.claude/settings.json`, triggering on events (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `Notification`, etc.).
 * **Endpoint (`POST /status?state=...`)**: Receives state notifications and updates the IDE tool window header and stripe button on the Event Dispatch Thread (EDT).
 
 ### Status Visuals & Animations (`ClaudeStatusIcons`)

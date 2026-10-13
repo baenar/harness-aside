@@ -11,10 +11,10 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 /**
- * Installs push-based status hooks for Claude Code into `.claude/settings.json`.
+ * Installs push-based status hooks for Claude Code into global `~/.claude/settings.json`.
  *
  * Each hook event executes a lightweight HTTP POST request via curl to the embedded
- * HarnessStatusServer running on 127.0.0.1:$HARNESS_IDE_PORT.
+ * HarnessStatusServer running on 127.0.0.1:$HARNESS_ASIDE_IDE_PORT.
  *
  * This delivers zero-CPU push status notification with no file polling or transcript tail parsing.
  */
@@ -22,12 +22,12 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
 
     private val settingsPath: Path get() = claudeDir.resolve("settings.json")
 
-    /** True when our status hooks are already present in the project settings. */
+    /** True when our status hooks are already present in settings.json. */
     fun isInstalled(): Boolean {
         if (!Files.exists(settingsPath)) return false
         return try {
             val content = Files.readString(settingsPath)
-            content.contains("HARNESS_IDE_PORT") || content.contains("/status?state=")
+            content.contains("HARNESS_ASIDE_IDE_PORT") || content.contains("/status?state=")
         } catch (e: Exception) {
             LOG.warn("Could not read $settingsPath", e)
             false
@@ -35,7 +35,7 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
     }
 
     /**
-     * Cleans up any legacy scripts and merges the HTTP hooks into `.claude/settings.json`,
+     * Cleans up any legacy scripts and merges the HTTP hooks into `settings.json`,
      * preserving unrelated settings and replacing entries from earlier plugin versions.
      *
      * @return true on success.
@@ -77,13 +77,16 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
         const val SCRIPT_FILE = "aside-status.sh"
         const val STATUS_DIR = "aside-status"
 
-        private val MARKERS = listOf("HARNESS_IDE_PORT", "/status?state=", SCRIPT_FILE, STATUS_DIR)
+        private val MARKERS = listOf("HARNESS_ASIDE_IDE_PORT", "HARNESS_IDE_PORT", "/status?state=", SCRIPT_FILE, STATUS_DIR)
 
-        fun forProject(project: Project): ClaudeStatusHooks? =
-            project.basePath?.let { ClaudeStatusHooks(Paths.get(it, CLAUDE_DIR)) }
+        fun forProject(project: Project, userHome: String = System.getProperty("user.home")): ClaudeStatusHooks? {
+            val projectPath = project.basePath ?: return null
+            val storage = ClaudeSessions.storage(userHome, projectPath)
+            return ClaudeStatusHooks(Paths.get(storage.userHome, CLAUDE_DIR))
+        }
 
         fun curlCommand(state: String): String =
-            "curl -s -X POST \"http://127.0.0.1:\$HARNESS_IDE_PORT/status?state=$state&token=\$HARNESS_IDE_TOKEN\" >/dev/null 2>&1 || true"
+            "[ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=$state&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true"
 
         /**
          * Adds our HTTP hooks to [root], dropping entries from earlier plugin versions so that

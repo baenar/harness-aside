@@ -19,11 +19,16 @@ class HarnessRegistryTest {
         val claude = HarnessRegistry.find("claude")
         assertNotNull(claude)
         assertEquals(ClaudeHarness, claude)
+
+        val antigravity = HarnessRegistry.find("antigravity")
+        assertNotNull(antigravity)
+        assertEquals(com.github.baenar.harnessaside.antigravity.AntigravityHarness, antigravity)
     }
 
     @Test
     fun `registered list contains default harnesses`() {
         val ids = HarnessRegistry.registered.map { it.id }
         assertTrue(ids.contains("claude"))
+        assertTrue(ids.contains("antigravity"))
     }
 }

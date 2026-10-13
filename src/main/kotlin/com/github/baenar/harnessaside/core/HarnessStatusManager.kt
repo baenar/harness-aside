@@ -71,25 +71,28 @@ class HarnessStatusManager(private val project: Project) : Disposable {
                                 onStatusChanged(HarnessStatus.IDLE)
                             }
                         }
-                    } else if (currentStatus == HarnessStatus.WAITING && (event.keyCode == KeyEvent.VK_ENTER || event.keyCode == KeyEvent.VK_ESCAPE)) {
-                        // User answered or dismissed the prompt via keyboard — immediately clear waiting indicator
-                        ApplicationManager.getApplication().invokeLater {
-                            if (!project.isDisposed && currentStatus == HarnessStatus.WAITING) {
-                                onStatusChanged(HarnessStatus.IDLE)
+                    } else if (currentStatus == HarnessStatus.WAITING) {
+                        // User interacted while prompt was waiting:
+                        // Enter, 'y', 'Y', or '1' approves the execution -> transition to EXECUTING_TOOL
+                        // Esc, 'n', 'N', or '2' denies/dismisses -> transition to IDLE
+                        // Navigation, arrow, or modifier keys keep the WAITING indicator intact
+                        val isApprove = event.keyCode == KeyEvent.VK_ENTER ||
+                            event.keyChar == 'y' || event.keyChar == 'Y' || event.keyChar == '1'
+                        val isDeny = event.keyCode == KeyEvent.VK_ESCAPE ||
+                            event.keyChar == 'n' || event.keyChar == 'N' || event.keyChar == '2'
+                        if (isApprove || isDeny) {
+                            val nextStatus = if (isApprove) HarnessStatus.EXECUTING_TOOL else HarnessStatus.IDLE
+                            ApplicationManager.getApplication().invokeLater {
+                                if (!project.isDisposed && currentStatus == HarnessStatus.WAITING) {
+                                    onStatusChanged(nextStatus)
+                                }
                             }
-                        }
-                    }
-                } else if (event is java.awt.event.MouseEvent && event.id == java.awt.event.MouseEvent.MOUSE_PRESSED && currentStatus == HarnessStatus.WAITING) {
-                    // User clicked an option (e.g. 'No') or clicked into the prompt — immediately clear waiting indicator
-                    ApplicationManager.getApplication().invokeLater {
-                        if (!project.isDisposed && currentStatus == HarnessStatus.WAITING) {
-                            onStatusChanged(HarnessStatus.IDLE)
                         }
                     }
                 }
             }
         }
-        Toolkit.getDefaultToolkit().addAWTEventListener(listener, AWTEvent.KEY_EVENT_MASK or AWTEvent.MOUSE_EVENT_MASK)
+        Toolkit.getDefaultToolkit().addAWTEventListener(listener, AWTEvent.KEY_EVENT_MASK)
         Disposer.register(parent) { Toolkit.getDefaultToolkit().removeAWTEventListener(listener) }
     }
 

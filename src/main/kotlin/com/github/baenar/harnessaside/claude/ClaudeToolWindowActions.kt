@@ -20,11 +20,14 @@ class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
         val project = e.project ?: return
         val cm = toolWindow.contentManager
         val closed = cm.selectedContent
+        val harnessId = closed?.getUserData(com.github.baenar.harnessaside.core.HARNESS_ID_KEY) ?: "claude"
+        val harness = com.github.baenar.harnessaside.core.HarnessRegistry.find(harnessId)
+            ?: com.github.baenar.harnessaside.core.HarnessRegistry.default
         val sessionId = ClaudeTerminalService.sessionIdOf(closed)
         HarnessToolWindowUi.isSwitching = true
         try {
             closed?.let { cm.removeContent(it, true) }
-            project.service<ClaudeTerminalService>().openContinuedSession(toolWindow, sessionId)
+            harness.openSession(project, toolWindow, true, sessionId)
         } finally {
             HarnessToolWindowUi.isSwitching = false
         }
