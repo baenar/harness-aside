@@ -75,6 +75,7 @@ class ClaudeTerminalService(private val project: Project) {
             content.isCloseable = true
             content.putUserData(WIDGET_KEY, widget)
             content.putUserData(com.github.baenar.harnessaside.core.HarnessTerminalService.WIDGET_KEY, widget)
+            content.putUserData(com.github.baenar.harnessaside.core.HARNESS_ID_KEY, "claude")
             content.putUserData(SESSION_KEY, sessionId)
 
             val status = project.service<ClaudeStatusService>()
@@ -84,6 +85,7 @@ class ClaudeTerminalService(private val project: Project) {
                 status.registerTab(it, content)
                 status.watchInterruptKeys(widget.component, it, tabScope)
             }
+            project.service<com.github.baenar.harnessaside.core.HarnessTerminalService>().forwardEscapeKey(widget, tabScope)
             // Closing the tab disposes the widget, terminating the pty.
             content.setDisposer {
                 sessionId?.let { status.unregisterTab(it) }

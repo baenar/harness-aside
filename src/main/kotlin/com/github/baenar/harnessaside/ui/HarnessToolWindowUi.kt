@@ -51,6 +51,7 @@ object HarnessToolWindowUi {
     fun hasActiveTerminal(toolWindow: ToolWindow): Boolean {
         val selected = toolWindow.contentManager.selectedContent ?: return false
         return selected.getUserData(LAUNCHER_KEY) != true &&
-            ClaudeTerminalService.hasTerminal(selected)
+            (ClaudeTerminalService.hasTerminal(selected) ||
+                selected.getUserData(com.github.baenar.harnessaside.core.HarnessTerminalService.WIDGET_KEY) != null)
     }
 }

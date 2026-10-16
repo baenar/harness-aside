@@ -35,10 +35,11 @@ class ClaudeStatusHooksTest {
         assertEquals(ClaudeStatusHooks.EVENT_TO_STATE.keys, hooks.keySet())
 
         val submitCmd = hookCommands(dir, "UserPromptSubmit").single()
-        assertTrue(submitCmd.contains("curl -s -X POST"))
+        assertTrue(submitCmd.contains("curl -s -m 2 --connect-timeout 1 -X POST"))
         assertTrue(submitCmd.contains("state=thinking"))
-        assertTrue(submitCmd.contains("HARNESS_IDE_PORT"))
-        assertTrue(submitCmd.contains("HARNESS_IDE_TOKEN"))
+        assertTrue(submitCmd.contains("HARNESS_ASIDE_IDE_PORT"))
+        assertTrue(submitCmd.contains("HARNESS_ASIDE_IDE_TOKEN"))
+        assertTrue(submitCmd.contains("[ -n \"\$HARNESS_ASIDE_IDE_PORT\" ]"))
 
         val notificationCmd = hookCommands(dir, "Notification").single()
         assertTrue(notificationCmd.contains("state=waiting"))
@@ -93,7 +94,7 @@ class ClaudeStatusHooksTest {
         )
         val stop = hookCommands(dir, "Stop")
         assertTrue("someone else's hook must survive", stop.contains("notify-send done"))
-        assertTrue(stop.any { it.contains("HARNESS_IDE_PORT") })
+        assertTrue(stop.any { it.contains("HARNESS_ASIDE_IDE_PORT") })
     }
 
     @Test
@@ -117,7 +118,7 @@ class ClaudeStatusHooksTest {
 
         val commands = hookCommands(dir, "UserPromptSubmit")
         assertEquals("the old entry must be replaced, not joined", 1, commands.size)
-        assertTrue(commands.single().contains("HARNESS_IDE_PORT"))
+        assertTrue(commands.single().contains("HARNESS_ASIDE_IDE_PORT"))
         assertFalse(commands.single().contains("aside-status.sh"))
     }
 

@@ -60,6 +60,12 @@ class ClaudeStatusIconsTest {
     }
 
     @Test
+    fun `brand icons exist on the classpath`() {
+        assertNotNull("missing claude icon", javaClass.getResource("/icons/claude.svg"))
+        assertNotNull("missing antigravity icon", javaClass.getResource("/icons/antigravity.svg"))
+    }
+
+    @Test
     fun `icons use theme action gray and do not use hardcoded black or currentColor`() {
         val names = listOf("manul-default", "manul_work_00", "manul_help_00")
         for (name in names) {

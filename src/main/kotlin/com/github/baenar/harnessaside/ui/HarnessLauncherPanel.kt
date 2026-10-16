@@ -3,6 +3,7 @@ package com.github.baenar.harnessaside.ui
 import com.github.baenar.harnessaside.core.Harness
 import com.github.baenar.harnessaside.core.HarnessRegistry
 import com.intellij.icons.AllIcons
+import com.intellij.util.IconUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.JBColor
@@ -107,15 +108,21 @@ class HarnessLauncherPanel(
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
         }
 
-        // Icon
-        val icon = harness.icon ?: AllIcons.Nodes.Console
+        // Icon (sized consistently to match the default harness icon)
+        val rawIcon = harness.icon ?: AllIcons.Nodes.Console
+        val targetSize = HarnessRegistry.default.icon?.iconWidth ?: JBUI.scale(20)
+        val icon = if (rawIcon.iconWidth > targetSize || rawIcon.iconHeight > targetSize) {
+            IconUtil.resizeSquared(rawIcon, targetSize)
+        } else {
+            rawIcon
+        }
         val iconLabel = JBLabel(icon)
         card.add(iconLabel, BorderLayout.WEST)
 
         // Details (Display Name & Executable)
-        val textPanel = JPanel().apply {
-            layout = BoxLayout(this, BoxLayout.Y_AXIS)
-            isOpaque = false
+            val textPanel = JPanel().apply {
+                layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                isOpaque = false
 
             val nameLabel = JBLabel(harness.displayName).apply {
                 font = JBFont.label().asBold()
@@ -133,6 +140,7 @@ class HarnessLauncherPanel(
 
         // Start Button
         val launchBtn = JButton("Start").apply {
+            isFocusable = false
             font = JBFont.small().asBold()
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             addActionListener {

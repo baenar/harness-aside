@@ -19,6 +19,13 @@ class HarnessLauncherUiTest {
         assertEquals("claude", claude?.executable)
         assertNotNull("Claude harness icon must not be null", claude?.icon)
         assertEquals(com.github.baenar.harnessaside.claude.ClaudeStatusIcons.CLAUDE, claude?.icon)
+
+        val antigravity = registered.firstOrNull { it.id == "antigravity" }
+        assertNotNull("Antigravity CLI must be registered", antigravity)
+        assertEquals("Antigravity CLI", antigravity?.displayName)
+        assertEquals("agy", antigravity?.executable)
+        assertNotNull("Antigravity harness icon must not be null", antigravity?.icon)
+        assertEquals(com.github.baenar.harnessaside.antigravity.AntigravityHarness.icon, antigravity?.icon)
     }
 
     @Test
