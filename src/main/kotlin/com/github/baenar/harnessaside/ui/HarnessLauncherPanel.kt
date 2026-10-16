@@ -140,6 +140,7 @@ class HarnessLauncherPanel(
 
         // Start Button
         val launchBtn = JButton("Start").apply {
+            isFocusable = false
             font = JBFont.small().asBold()
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             addActionListener {
