@@ -81,14 +81,10 @@ class ClaudeTerminalService(private val project: Project) {
             val status = project.service<ClaudeStatusService>()
             // Scoped to this tab: the key watcher must go when the tab does.
             val tabScope = Disposer.newDisposable("Claude Aside tab")
-            sessionId?.let {
-                status.registerTab(it, content)
-                status.watchInterruptKeys(widget.component, it, tabScope)
-            }
+            sessionId?.let { status.watchInterruptKeys(widget.component, it, tabScope) }
             project.service<com.github.baenar.harnessaside.core.HarnessTerminalService>().forwardEscapeKey(widget, tabScope)
             // Closing the tab disposes the widget, terminating the pty.
             content.setDisposer {
-                sessionId?.let { status.unregisterTab(it) }
                 Disposer.dispose(tabScope)
                 Disposer.dispose(widget)
             }
@@ -124,8 +120,7 @@ class ClaudeTerminalService(private val project: Project) {
      * A shell command plus the session id it will run under.
      *
      * Bare `claude -c` is deliberately never used: it resumes without telling anyone which
-     * session it picked, and [ClaudeStatusService] needs that id to match a tab to its
-     * state file and transcript.
+     * session it picked, so the tab could not record (or later resume) its session.
      */
     data class Launch(val command: String, val sessionId: String) {
         companion object {
@@ -142,32 +137,6 @@ class ClaudeTerminalService(private val project: Project) {
         val SESSION_KEY: Key<String> = Key.create<String>("claude.aside.sessionId")
 
         fun hasTerminal(content: Content?): Boolean = content?.getUserData(WIDGET_KEY) != null
-
-        /** Name and forwarding flag of the variable that turns Claude's OSC 8 links off. */
-        private const val FORWARDED = "FORCE_HYPERLINK/u"
-
-        /**
-         * Environment overrides for a tab's shell. The platform merges these over the
-         * inherited environment, so this map is additions, not a replacement.
-         *
-         * `FORCE_HYPERLINK=0` stops Claude emitting OSC 8 hyperlinks. They deadlock the
-         * classic terminal: jediterm parses the sequence holding the text-buffer lock and
-         * then waits on the IDE's hyperlink filters, which want that same lock, while the
-         * EDT waits behind both to paint. It unwinds only on jediterm's own timeout, so
-         * every hyperlink cost a ~6s freeze.
-         *
-         * WSL is a second hop — the variable is set on `wsl.exe`, and only names listed in
-         * [inheritedWslEnv] cross into the distro — so ours is appended to whatever the
-         * user already had. The platform in turn appends its own names to this, rather
-         * than overwriting it.
-         */
-        fun claudeEnv(inheritedWslEnv: String?): Map<String, String> {
-            val inherited = inheritedWslEnv?.removeSuffix(":").orEmpty()
-            return mapOf(
-                "FORCE_HYPERLINK" to "0",
-                "WSLENV" to if (inherited.isEmpty()) FORWARDED else "$inherited:$FORWARDED",
-            )
-        }
 
         /** The Claude session running in [content], when the plugin launched it with a known id. */
         fun sessionIdOf(content: Content?): String? = content?.getUserData(SESSION_KEY)

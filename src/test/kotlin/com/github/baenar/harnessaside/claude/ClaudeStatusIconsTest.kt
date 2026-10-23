@@ -13,14 +13,6 @@ import org.junit.Test
 class ClaudeStatusIconsTest {
 
     @Test
-    fun `only busy states animate`() {
-        assertTrue(ClaudeStatusIcons.isAnimated(ClaudeStatus.THINKING))
-        assertTrue(ClaudeStatusIcons.isAnimated(ClaudeStatus.WAITING))
-        assertFalse(ClaudeStatusIcons.isAnimated(ClaudeStatus.IDLE))
-        assertFalse("no status yet is a still icon too", ClaudeStatusIcons.isAnimated(null))
-    }
-
-    @Test
     fun `harness busy states animate`() {
         assertTrue(ClaudeStatusIcons.isAnimatedHarness(HarnessStatus.THINKING))
         assertTrue(ClaudeStatusIcons.isAnimatedHarness(HarnessStatus.EXECUTING_TOOL))

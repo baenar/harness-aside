@@ -138,23 +138,7 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
             "SessionEnd" to "idle",
         )
 
-        /** Retained for backwards compatibility with any existing callers. */
-        @JvmField
-        val EVENT_TO_WORD = linkedMapOf(
-            "SessionStart" to "idle",
-            "UserPromptSubmit" to "thinking",
-            "PreToolUse" to "thinking",
-            "PostToolUse" to "thinking",
-            "PostToolUseFailure" to "idle",
-            "Notification" to "waiting",
-            "PermissionRequest" to "waiting",
-            "PermissionDenied" to "idle",
-            "Stop" to "idle",
-            "StopFailure" to "idle",
-            "SessionEnd" to "end",
-        )
-
-        /** Retained for backwards compatibility if needed. */
+        /** Written over a legacy `aside-status.sh` so Claude sessions still referencing it don't fail. */
         @JvmField
         val SCRIPT = "#!/bin/sh\n# Migrated to HTTP status events in harness-aside\nexit 0\n"
     }

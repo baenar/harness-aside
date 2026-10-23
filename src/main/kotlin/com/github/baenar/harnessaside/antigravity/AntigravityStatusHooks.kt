@@ -64,7 +64,6 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
         private val LOG = logger<AntigravityStatusHooks>()
         private val GSON = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
 
-        const val AGENTS_DIR = ".agents"
         const val HOOK_NAME = "harness-aside"
 
         /** Canned `PreToolUse` reply, kept in a file because a Windows hook command can't safely contain `"`. */
