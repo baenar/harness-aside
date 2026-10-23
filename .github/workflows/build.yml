@@ -1,9 +1,9 @@
 # Builds the plugin, runs tests, and runs the IntelliJ Plugin Verifier.
 # Triggered on pushes to 'main', on any pull request, and manually.
 #
-# Tests run on Linux *and* Windows on purpose: several of them shell out to `sh` (the hook
-# reporter script) and the Windows leg is the only one exercising the Git-for-Windows
-# fallback that this plugin's users actually depend on.
+# Tests run on Linux *and* Windows on purpose: AntigravityHookExecutionTest executes the generated
+# hook commands with the shell the CLI uses on that OS (`/bin/sh` or `cmd.exe`), so the Windows leg
+# is the only one that catches a hook command cmd can't run.
 
 name: Build
 on:
@@ -110,8 +110,7 @@ jobs:
       - name: Run Tests
         run: ./gradlew check
 
-      # The hook reporter script is only covered when a POSIX shell is present; without
-      # this the suite would quietly skip those tests and still report success.
+      # A skipped test would let the suite report success without covering anything.
       - name: Assert no tests were skipped
         if: ${{ !cancelled() }}
         run: |
