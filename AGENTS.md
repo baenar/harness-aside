@@ -25,7 +25,7 @@
 
 ### Antigravity CLI Harness Integration
 * **CLI Execution (`AntigravityHarness`)**: Launches Antigravity CLI sessions (`agy`) inside the dedicated terminal tool window using the Antigravity brand icon.
-* **Push-Based Hook Configuration (`AntigravityStatusHooks`)**: Generates and merges lifecycle hooks into global `~/.gemini/config/hooks.json` (`SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `Stop`) with guarded curl status webhooks.
+* **Push-Based Hook Configuration (`AntigravityStatusHooks`)**: Generates and merges lifecycle hooks into global `~/.gemini/config/hooks.json` (`SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `Stop`) with guarded curl status webhooks. The commands are written per target: POSIX `sh` syntax for Linux/macOS/WSL, and a quote-free `cmd.exe` variant (`curl.exe`, `%VAR%`, always `exit 0`) for native Windows, where `PreToolUse`/`PostToolUse` forward their stdin to `POST /status?event=` and the server classifies the tool/error (`AntigravityHookEvents`).
 * **Interrupt Detection**: Wires terminal interrupt signals (Ctrl+C) via `HarnessStatusManager` to reset status icons back to idle.
 
 ### Push-Based Status Server (`HarnessStatusServer`)

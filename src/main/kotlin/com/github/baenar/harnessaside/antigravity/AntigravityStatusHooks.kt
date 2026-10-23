@@ -1,5 +1,6 @@
 package com.github.baenar.harnessaside.antigravity
 
+import com.github.baenar.harnessaside.claude.ClaudeSessions
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -15,8 +16,11 @@ import java.nio.file.Paths
  *
  * Each hook event executes a lightweight HTTP POST request via curl to the embedded
  * HarnessStatusServer running on 127.0.0.1:$HARNESS_ASIDE_IDE_PORT.
+ *
+ * Hook commands run through `sh` on Linux/macOS/WSL and through `cmd.exe` on native Windows, so
+ * [windows] picks the matching command syntax for the `hooks.json` being written.
  */
-class AntigravityStatusHooks(private val configDir: Path) {
+class AntigravityStatusHooks(private val configDir: Path, private val windows: Boolean = false) {
 
     private val hooksPath: Path get() = configDir.resolve("hooks.json")
 
@@ -48,7 +52,8 @@ class AntigravityStatusHooks(private val configDir: Path) {
         } else {
             JsonObject()
         }
-        Files.writeString(hooksPath, GSON.toJson(merge(root)))
+        if (windows) Files.writeString(configDir.resolve(ALLOW_FILE), ALLOW_JSON)
+        Files.writeString(hooksPath, GSON.toJson(merge(root, windows)))
         true
     } catch (e: Exception) {
         LOG.warn("Could not install status hooks into $hooksPath", e)
@@ -62,36 +67,67 @@ class AntigravityStatusHooks(private val configDir: Path) {
         const val AGENTS_DIR = ".agents"
         const val HOOK_NAME = "harness-aside"
 
+        /** Canned `PreToolUse` reply, kept in a file because a Windows hook command can't safely contain `"`. */
+        const val ALLOW_FILE = "harness-aside-allow.json"
+        private const val ALLOW_JSON = "{\"decision\":\"allow\"}"
+
         fun forProject(project: Project, userHome: String = System.getProperty("user.home")): AntigravityStatusHooks? {
             val projectPath = project.basePath ?: return null
-            val storage = com.github.baenar.harnessaside.claude.ClaudeSessions.storage(userHome, projectPath)
-            return AntigravityStatusHooks(Paths.get(storage.userHome, ".gemini", "config"))
+            val storage = ClaudeSessions.storage(userHome, projectPath)
+            val windows = isWindowsTarget(System.getProperty("os.name"), storage.userHome)
+            return AntigravityStatusHooks(Paths.get(storage.userHome, ".gemini", "config"), windows)
         }
+
+        /**
+         * True when the `hooks.json` at [userHome] is read by a native Windows `agy`. A Windows IDE with the
+         * project inside WSL writes to the distro's home, where `agy` runs under `sh`.
+         */
+        fun isWindowsTarget(osName: String, userHome: String): Boolean =
+            osName.startsWith("Windows", ignoreCase = true) && !ClaudeSessions.isWsl(userHome)
 
         fun curlCommand(state: String, stdoutJson: String = "{}"): String =
             "[ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=$state&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true; echo '$stdoutJson'"
 
         fun preToolUseCommand(): String =
-            "PAYLOAD=\$(cat); if echo \"\$PAYLOAD\" | grep -qE '\"(run_command|ask_question|ask_permission|write_to_file|replace_file_content|multi_replace_file_content)\"'; then STATE=\"waiting\"; else STATE=\"tool\"; fi; [ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=\$STATE&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true; echo '{\"decision\":\"allow\"}'"
+            "PAYLOAD=\$(cat); if echo \"\$PAYLOAD\" | grep -qE '\"(${AntigravityHookEvents.WAITING_TOOLS.joinToString("|")})\"'; then STATE=\"waiting\"; else STATE=\"tool\"; fi; [ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=\$STATE&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true; echo '{\"decision\":\"allow\"}'"
 
         fun postToolUseCommand(): String =
             "PAYLOAD=\$(cat); echo \"\$PAYLOAD\" | grep -qE '\"error\":[[:space:]]*\"[^\"]+' && STATE=\"idle\" || STATE=\"thinking\"; [ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=\$STATE&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true; echo '{}'"
 
+        // Windows hooks run in cmd.exe, where a non-zero exit blocks the tool call, so every command ends in exit 0.
+        // No double quotes anywhere: they reach cmd backslash-escaped. `%VAR%` stays literal when the variable is
+        // unset, which makes curl fail on the URL and is swallowed like any other connection failure.
+        private const val CURL_WINDOWS =
+            "curl.exe -s -m 2 --connect-timeout 1 -H X-Harness-Token:%HARNESS_ASIDE_IDE_TOKEN%"
+        private const val STATUS_URL_WINDOWS = "http://127.0.0.1:%HARNESS_ASIDE_IDE_PORT%/status"
+
+        fun windowsStateCommand(state: String): String =
+            "$CURL_WINDOWS -X POST $STATUS_URL_WINDOWS?state=$state >NUL 2>&1 & echo {}"
+
+        /** Forwards the hook's stdin; the server picks the state (see [AntigravityHookEvents]). */
+        fun windowsToolCommand(event: String): String {
+            val reply = if (event == "PreToolUse") "type $ALLOW_FILE 2>NUL & exit 0" else "echo {}"
+            return "$CURL_WINDOWS --data-binary @- $STATUS_URL_WINDOWS?event=$event >NUL 2>&1 & $reply"
+        }
+
         /**
-         * Adds or replaces the `harness-aside` hook group in [root].
+         * Adds or replaces the `harness-aside` hook group in [root], with commands for `cmd.exe` when [windows].
          */
-        fun merge(root: JsonObject): JsonObject {
+        fun merge(root: JsonObject, windows: Boolean = false): JsonObject {
+            fun state(state: String) = if (windows) windowsStateCommand(state) else curlCommand(state, "{}")
+            val preTool = if (windows) windowsToolCommand("PreToolUse") else preToolUseCommand()
+            val postTool = if (windows) windowsToolCommand("PostToolUse") else postToolUseCommand()
             val group = JsonObject()
 
             // SessionStart -> idle
             val sessionStart = JsonArray().apply {
-                add(createCommandHook(curlCommand("idle", "{}")))
+                add(createCommandHook(state("idle")))
             }
             group.add("SessionStart", sessionStart)
 
             // PreInvocation -> thinking
             val preInvocation = JsonArray().apply {
-                add(createCommandHook(curlCommand("thinking", "{}")))
+                add(createCommandHook(state("thinking")))
             }
             group.add("PreInvocation", preInvocation)
 
@@ -100,7 +136,7 @@ class AntigravityStatusHooks(private val configDir: Path) {
                 val toolObj = JsonObject().apply {
                     addProperty("matcher", "*")
                     val hooks = JsonArray().apply {
-                        add(createCommandHook(preToolUseCommand()))
+                        add(createCommandHook(preTool))
                     }
                     add("hooks", hooks)
                 }
@@ -113,7 +149,7 @@ class AntigravityStatusHooks(private val configDir: Path) {
                 val toolObj = JsonObject().apply {
                     addProperty("matcher", "*")
                     val hooks = JsonArray().apply {
-                        add(createCommandHook(postToolUseCommand()))
+                        add(createCommandHook(postTool))
                     }
                     add("hooks", hooks)
                 }
@@ -123,13 +159,13 @@ class AntigravityStatusHooks(private val configDir: Path) {
 
             // PostInvocation -> idle
             val postInvocation = JsonArray().apply {
-                add(createCommandHook(curlCommand("idle", "{}")))
+                add(createCommandHook(state("idle")))
             }
             group.add("PostInvocation", postInvocation)
 
             // Stop -> idle
             val stop = JsonArray().apply {
-                add(createCommandHook(curlCommand("idle", "{}")))
+                add(createCommandHook(state("idle")))
             }
             group.add("Stop", stop)
 

@@ -54,6 +54,12 @@ object ClaudeSessions {
         if (linuxPath == "/root" || linuxPath.startsWith("/root/")) "/root"
         else WSL_HOME.matchEntire(linuxPath)?.groupValues?.get(1)
 
+    /** True for a `\\wsl$\distro\...` or `\\wsl.localhost\distro\...` path. */
+    fun isWsl(path: String): Boolean {
+        val normalized = path.replace('\\', '/')
+        return WSL_PREFIXES.any { normalized.startsWith(it, ignoreCase = true) }
+    }
+
     /** Both spellings Windows mounts a distro under; `wsl.localhost` is the newer one. */
     private val WSL_PREFIXES = listOf("//wsl\$/", "//wsl.localhost/")
     private val WSL_HOME = Regex("^(/home/[^/]+)(?:/.*)?$")
