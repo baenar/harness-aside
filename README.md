@@ -33,6 +33,11 @@ still glyph.
 | Linux    | **Verified** — exercised end to end natively on Linux                           |
 | macOS    | **Unverified** — prolly safe to run, not tested                                 |
 
+Status hooks last verified by hand against **Antigravity CLI 1.4.6** (WSL) and **1.4.4** (native Windows),
+and **Claude Code 2.1.309** (WSL). CI runs every generated Antigravity hook command through `/bin/sh` (Linux)
+and `cmd.exe` (Windows) against a live status server, but it can't notice a CLI release that changes how
+hooks are launched, so re-check by hand after upgrading either CLI.
+
 IDEs: developed and run against IntelliJ IDEA Community. PyCharm should load it — the
 plugin depends only on the platform and the terminal — but that is untested too.
 

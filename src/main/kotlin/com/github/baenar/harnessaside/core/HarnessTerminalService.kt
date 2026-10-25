@@ -104,6 +104,11 @@ class HarnessTerminalService(private val project: Project) {
 
     /**
      * Environment variables for the harness shell, providing server connection details.
+     *
+     * `FORCE_HYPERLINK=0` stops Claude emitting OSC 8 hyperlinks. They deadlock the classic
+     * terminal (jediterm holds the text-buffer lock while the IDE's hyperlink filters wait for
+     * it), costing a ~6s freeze per link. WSL only passes names listed in `WSLENV` into the
+     * distro, so ours are appended to whatever the user already forwards.
      */
     fun harnessEnv(inheritedWslEnv: String? = System.getenv("WSLENV")): Map<String, String> {
         val server = HarnessStatusServer.getInstance(project)

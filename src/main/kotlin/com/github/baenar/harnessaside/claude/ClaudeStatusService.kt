@@ -6,7 +6,6 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.ui.content.Content
 import java.awt.Component
 
 /**
@@ -23,14 +22,6 @@ class ClaudeStatusService(private val project: Project) : Disposable {
     fun ensureStarted() {
         statusServer.ensureStarted()
         statusManager.ensureStarted()
-    }
-
-    fun registerTab(sessionId: String, content: Content) {
-        // Registered tab
-    }
-
-    fun unregisterTab(sessionId: String) {
-        // Unregistered tab
     }
 
     fun watchInterruptKeys(component: Component, sessionId: String, parent: Disposable) {

@@ -82,4 +82,67 @@ class AntigravityStatusHooksTest {
         assertTrue(postToolCmd.contains("idle"))
         assertTrue(postToolCmd.contains("thinking"))
     }
+
+    @Test
+    fun `posix pre-tool command still matches every waiting tool`() {
+        val cmd = AntigravityStatusHooks.preToolUseCommand()
+        assertTrue(cmd.contains("(run_command|ask_question|ask_permission|write_to_file|replace_file_content|multi_replace_file_content)"))
+    }
+
+    @Test
+    fun `windows variant installs cmd-safe commands and the allow file`() {
+        val dir = tmp.root.toPath().resolve(".gemini").resolve("config")
+        assertTrue(AntigravityStatusHooks(dir, windows = true).install())
+
+        assertEquals("""{"decision":"allow"}""", Files.readString(dir.resolve(AntigravityStatusHooks.ALLOW_FILE)))
+
+        val group = JsonParser.parseString(Files.readString(dir.resolve("hooks.json")))
+            .asJsonObject.getAsJsonObject("harness-aside")
+        val commands = commandsOf(group)
+        assertEquals(6, commands.size)
+        for (cmd in commands) {
+            assertTrue(cmd, cmd.startsWith("curl.exe "))
+            assertFalse("double quotes reach cmd backslash-escaped: $cmd", cmd.contains('"'))
+            assertFalse("not a cmd construct: $cmd", cmd.contains("\$") || cmd.contains("[ -n") || cmd.contains("/dev/null"))
+            assertTrue(cmd, cmd.contains("%HARNESS_ASIDE_IDE_PORT%") && cmd.contains("X-Harness-Token:%HARNESS_ASIDE_IDE_TOKEN%"))
+            assertTrue("a non-zero exit blocks the tool call: $cmd", cmd.endsWith("echo {}") || cmd.endsWith("exit 0"))
+        }
+        assertTrue(commands.any { it.contains("--data-binary @-") && it.contains("?event=PreToolUse") && it.contains("type ${AntigravityStatusHooks.ALLOW_FILE}") })
+        assertTrue(commands.any { it.contains("--data-binary @-") && it.contains("?event=PostToolUse") })
+        assertTrue(commands.any { it.contains("-X POST") && it.contains("?state=thinking") })
+    }
+
+    @Test
+    fun `reinstalling for windows replaces a posix group`() {
+        val dir = tmp.root.toPath().resolve(".gemini").resolve("config")
+        assertTrue(AntigravityStatusHooks(dir).install())
+        assertTrue(AntigravityStatusHooks(dir, windows = true).install())
+
+        val group = JsonParser.parseString(Files.readString(dir.resolve("hooks.json")))
+            .asJsonObject.getAsJsonObject("harness-aside")
+        assertTrue(commandsOf(group).all { it.startsWith("curl.exe ") })
+    }
+
+    @Test
+    fun `posix install writes no allow file`() {
+        val dir = tmp.root.toPath().resolve(".gemini").resolve("config")
+        assertTrue(AntigravityStatusHooks(dir).install())
+        assertFalse(Files.exists(dir.resolve(AntigravityStatusHooks.ALLOW_FILE)))
+    }
+
+    @Test
+    fun `windows target is native windows only`() {
+        assertTrue(AntigravityStatusHooks.isWindowsTarget("Windows 11", "C:\\Users\\me"))
+        assertFalse("WSL home read by agy under sh", AntigravityStatusHooks.isWindowsTarget("Windows 11", "//wsl$/Debian/home/me"))
+        assertFalse(AntigravityStatusHooks.isWindowsTarget("Windows 11", "\\\\wsl.localhost\\Debian\\home\\me"))
+        assertFalse(AntigravityStatusHooks.isWindowsTarget("Linux", "/home/me"))
+        assertFalse(AntigravityStatusHooks.isWindowsTarget("Mac OS X", "/Users/me"))
+    }
+
+    private fun commandsOf(group: JsonObject): List<String> = group.entrySet().flatMap { (_, entries) ->
+        entries.asJsonArray.flatMap { entry ->
+            val handler = entry.asJsonObject
+            if (handler.has("hooks")) handler.getAsJsonArray("hooks").map { it.asJsonObject } else listOf(handler)
+        }
+    }.map { it.get("command").asString }
 }

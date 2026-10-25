@@ -1,5 +1,6 @@
 package com.github.baenar.harnessaside.core
 
+import com.github.baenar.harnessaside.antigravity.AntigravityHookEvents
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -82,12 +83,21 @@ class HarnessStatusServer(private val project: Project?) : Disposable {
         override fun handle(exchange: HttpExchange) {
             try {
                 val query = parseQuery(exchange.requestURI.query)
-                val stateParam = query["state"]
                 val tokenParam = query["token"] ?: exchange.requestHeaders.getFirst("X-Harness-Token")
 
                 if (tokenParam != null && tokenParam.isNotEmpty() && tokenParam != token) {
                     sendResponse(exchange, 401, "Unauthorized\n")
                     return
+                }
+
+                // `event=` carries a harness hook payload to classify (Windows hooks can't); `state=` is pre-classified.
+                val event = query["event"]
+                val stateParam = if (event == null) query["state"] else {
+                    val body = String(exchange.requestBody.readNBytes(MAX_EVENT_BODY), StandardCharsets.UTF_8)
+                    AntigravityHookEvents.state(event, body) ?: run {
+                        sendResponse(exchange, 400, "Unknown event\n")
+                        return
+                    }
                 }
 
                 val status = when (stateParam?.lowercase()?.trim()) {
@@ -145,6 +155,9 @@ class HarnessStatusServer(private val project: Project?) : Disposable {
 
     companion object {
         private val LOG = logger<HarnessStatusServer>()
+
+        /** Cap on a hook payload; a truncated one fails to parse and falls back to the default state. */
+        private const val MAX_EVENT_BODY = 1 shl 20
 
         fun getInstance(project: Project): HarnessStatusServer = project.service()
     }
