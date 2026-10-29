@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowManager
@@ -16,7 +17,7 @@ import com.intellij.openapi.wm.ToolWindowManager
  * Editor action: inserts a reference to the current file (and selected line range) into
  * the active harness terminal as `@path/to/file#Lx-Ly`, without submitting it.
  */
-open class SendSelectionToHarnessAction : AnAction() {
+open class SendSelectionToHarnessAction : AnAction(), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return

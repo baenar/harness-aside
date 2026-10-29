@@ -109,6 +109,11 @@ class HarnessTerminalService(private val project: Project) {
      * terminal (jediterm holds the text-buffer lock while the IDE's hyperlink filters wait for
      * it), costing a ~6s freeze per link. WSL only passes names listed in `WSLENV` into the
      * distro, so ours are appended to whatever the user already forwards.
+     *
+     * `CLAUDE_CODE_SSE_PORT` / `ENABLE_IDE_INTEGRATION` aren't set here: the official Claude Code
+     * plugin, when installed, adds them to every local terminal (its `LocalTerminalCustomizer`)
+     * so `claude` connects to that plugin's IDE MCP server. They're only forwarded, so the
+     * connection also works for `claude` inside WSL.
      */
     fun harnessEnv(inheritedWslEnv: String? = System.getenv("WSLENV")): Map<String, String> {
         val server = HarnessStatusServer.getInstance(project)
@@ -116,7 +121,8 @@ class HarnessTerminalService(private val project: Project) {
         val token = server.token
 
         val inherited = inheritedWslEnv?.removeSuffix(":").orEmpty()
-        val forwarded = "FORCE_HYPERLINK/u:HARNESS_ASIDE_IDE_PORT/u:HARNESS_ASIDE_IDE_TOKEN/u:HARNESS_IDE_PORT/u:HARNESS_IDE_TOKEN/u"
+        val forwarded = "FORCE_HYPERLINK/u:HARNESS_ASIDE_IDE_PORT/u:HARNESS_ASIDE_IDE_TOKEN/u:HARNESS_IDE_PORT/u:HARNESS_IDE_TOKEN/u" +
+            ":CLAUDE_CODE_SSE_PORT/u:ENABLE_IDE_INTEGRATION/u"
         val wslEnv = if (inherited.isEmpty()) forwarded else "$inherited:$forwarded"
 
         return mapOf(

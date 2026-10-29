@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.service
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 
@@ -14,7 +15,7 @@ import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
 
 /** Title-bar action: close the current tab and reopen it resuming the same session. */
 class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
-    AnAction("Restart Tab", "Close this tab and start Claude again resuming its session", AllIcons.Actions.Restart) {
+    AnAction("Restart Tab", "Close this tab and start Claude again resuming its session", AllIcons.Actions.Restart), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -42,7 +43,7 @@ class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
 
 /** Title-bar action: close the current tab, terminating its terminal (pty) and returning to launcher. */
 class RemoveClaudeTabAction(private val toolWindow: ToolWindow) :
-    AnAction("Close Tab", "Close this tab and return to harness launcher", AllIcons.Actions.Close) {
+    AnAction("Close Tab", "Close this tab and return to harness launcher", AllIcons.Actions.Close), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
         val cm = toolWindow.contentManager
@@ -65,7 +66,7 @@ class RemoveClaudeTabAction(private val toolWindow: ToolWindow) :
  * wrong" into a specific broken link.
  */
 class DiagnoseStatusAction(private val project: Project) :
-    AnAction("Diagnose Status Indicator", "Show what the status indicator currently sees", AllIcons.General.Information) {
+    AnAction("Diagnose Status Indicator", "Show what the status indicator currently sees", AllIcons.General.Information), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
         NotificationGroupManager.getInstance()
@@ -87,7 +88,7 @@ class DiagnoseStatusAction(private val project: Project) :
  * startup notification.
  */
 class EnableStatusHooksAction(private val project: Project) :
-    AnAction("Enable Status Indicator (Install Hooks)", "Add status hooks to .claude/settings.json", AllIcons.General.Settings) {
+    AnAction("Enable Status Indicator (Install Hooks)", "Add status hooks to .claude/settings.json", AllIcons.General.Settings), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
         val ok = ClaudeStatusHooks.forProject(project)?.install() ?: false
