@@ -48,7 +48,14 @@ plugin depends only on the platform and the terminal — but that is untested to
 ./gradlew check         # tests
 ./gradlew verifyPlugin  # plugin structure + IntelliJ Plugin Verifier
 ./gradlew buildPlugin   # -> build/distributions/harness-aside-<version>.zip
+./gradlew deployToIde   # build, swap into the running IntelliJ and restart it
 ```
+
+Gradle job `deployToIde` closes the running `idea64` (asking it nicely first,
+forcing it after 30s), replaces `%APPDATA%\JetBrains\<IDE>\plugins\harness-aside` and starts it
+again. Use `-PideProcess=pycharm64` for PyCharm. The swap runs detached, so it survives the IDE
+closing even when started from the IDE's own terminal; check `%TEMP%\harness-aside-deploy.log` if
+the IDE doesn't come back.
 
 From a WSL shell, point Gradle at a JDK: `JAVA_HOME=~/.jdks/openjdk-26.0.2 ./gradlew …`
 (not needed when running from the IDE). The build toolchain is JDK 21; Gradle provisions it itself.
