@@ -63,6 +63,8 @@ From a WSL shell, point Gradle at a JDK: `JAVA_HOME=~/.jdks/openjdk-26.0.2 ./gra
 
 CI (`.github/workflows/build.yml`) runs the same three tasks — `buildPlugin`, `check`, `verifyPlugin` —
 and uploads the installable zip as a workflow artifact (per commit, 90-day expiry, login required).
+It runs on every push to `main`, but on a pull request only when the PR gets the **`test ready`**
+label; pushing more commits runs nothing, so remove the label and add it again to test the latest head.
 
 ## Releasing
 
