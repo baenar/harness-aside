@@ -51,8 +51,8 @@ plugin depends only on the platform and the terminal — but that is untested to
 ./gradlew deployToIde   # build, swap into the running IntelliJ and restart it
 ```
 
-Gradle job `deployToIde` closes the running `idea64` (asking it nicely first,
-forcing it after 30s), replaces `%APPDATA%\JetBrains\<IDE>\plugins\harness-aside` and starts it
+Gradle job `deployToIde` closes the running `idea64` (never forcibly — a killed IDE reindexes the
+whole project — so answer its exit prompts; it gives up after 5 minutes), replaces `%APPDATA%\JetBrains\<IDE>\plugins\harness-aside` and starts it
 again. Use `-PideProcess=pycharm64` for PyCharm. The swap runs detached, so it survives the IDE
 closing even when started from the IDE's own terminal; check `%TEMP%\harness-aside-deploy.log` if
 the IDE doesn't come back.

@@ -14,11 +14,11 @@ try {
     if (-not (Test-Path $Zip)) { throw "Plugin zip not found: $Zip" }
     Write-Output "IDE: $exe", "Plugins: $plugins", "Zip: $Zip"
 
-    # Ask nicely first (the IDE may ask to confirm exit); force it only if still running after 30s.
     $ide | ForEach-Object { [void]$_.CloseMainWindow() }
-    $ide | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-    $ide | Where-Object { -not $_.HasExited } | Stop-Process -Force
-    $ide | Wait-Process -ErrorAction SilentlyContinue   # the plugin's jars stay locked until it is gone
+    $ide | Wait-Process -Timeout 300 -ErrorAction SilentlyContinue
+    if ($ide | Where-Object { -not $_.HasExited }) {
+        throw "$IdeProcess did not close within 5 minutes; nothing was changed. Close it and run deployToIde again."
+    }
 
     New-Item -ItemType Directory -Force -Path $plugins | Out-Null
     Remove-Item (Join-Path $plugins 'harness-aside') -Recurse -Force -ErrorAction SilentlyContinue
