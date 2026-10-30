@@ -72,16 +72,12 @@ class HarnessStatusManager(private val project: Project) : Disposable {
                             }
                         }
                     } else if (currentStatus == HarnessStatus.WAITING) {
-                        // User interacted while prompt was waiting:
-                        // Enter, 'y', 'Y', or '1' approves the execution -> transition to EXECUTING_TOOL
-                        // Esc, 'n', 'N', or '2' denies/dismisses -> transition to IDLE
-                        // Navigation, arrow, or modifier keys keep the WAITING indicator intact
-                        val isApprove = event.keyCode == KeyEvent.VK_ENTER ||
-                            event.keyChar == 'y' || event.keyChar == 'Y' || event.keyChar == '1'
-                        val isDeny = event.keyCode == KeyEvent.VK_ESCAPE ||
-                            event.keyChar == 'n' || event.keyChar == 'N' || event.keyChar == '2'
-                        if (isApprove || isDeny) {
-                            val nextStatus = if (isApprove) HarnessStatus.EXECUTING_TOOL else HarnessStatus.IDLE
+                        // WAITING only ever means an open dialog (see ClaudeStatusHooks.HOOKS), so a key
+                        // that answers it moves on at once: approve -> the tool runs, decline -> idle.
+                        // Navigation and other keys keep the WAITING indicator intact.
+                        val approved = ClaudeInterruptKeys.permissionAnswer(event.keyCode, event.keyChar)
+                        if (approved != null) {
+                            val nextStatus = if (approved) HarnessStatus.EXECUTING_TOOL else HarnessStatus.IDLE
                             ApplicationManager.getApplication().invokeLater {
                                 if (!project.isDisposed && currentStatus == HarnessStatus.WAITING) {
                                     onStatusChanged(nextStatus)

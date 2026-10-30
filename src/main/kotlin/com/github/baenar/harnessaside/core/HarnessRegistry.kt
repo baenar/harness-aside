@@ -11,6 +11,7 @@ import com.github.baenar.harnessaside.claude.ClaudeHarness
 object HarnessRegistry {
 
     private val harnesses = mutableMapOf<String, Harness>(
+        TerminalHarness.id to TerminalHarness,
         ClaudeHarness.id to ClaudeHarness,
         AntigravityHarness.id to AntigravityHarness,
     )

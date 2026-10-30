@@ -19,9 +19,17 @@ object HookShell {
 
     data class Result(val exitCode: Int, val stdout: String, val stderr: String)
 
-    /** [env] entries with a null value are removed from the inherited environment. */
-    fun run(command: String, cwd: Path, env: Map<String, String?> = emptyMap(), stdin: String = ""): Result {
-        val argv = if (isWindows) listOf("cmd.exe", "/c", goEscapeArg(command)) else listOf("/bin/sh", "-c", command)
+    /**
+     * [env] entries with a null value are removed from the inherited environment. [posix] runs `sh -c` on
+     * every OS, for Claude Code, which runs its hooks through Git Bash on Windows. Claude (Bun/libuv) quotes
+     * that argument by the usual Windows rules, as [goEscapeArg] does; Java would pass inner `"` unescaped.
+     */
+    fun run(command: String, cwd: Path, env: Map<String, String?> = emptyMap(), stdin: String = "", posix: Boolean = !isWindows): Result {
+        val argv = when {
+            !posix -> listOf("cmd.exe", "/c", goEscapeArg(command))
+            isWindows -> listOf("sh", "-c", goEscapeArg(command))
+            else -> listOf("/bin/sh", "-c", command)
+        }
         val builder = ProcessBuilder(argv).directory(cwd.toFile())
         for ((name, value) in env) {
             if (value == null) builder.environment().remove(name) else builder.environment()[name] = value

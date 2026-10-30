@@ -89,6 +89,40 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
             "[ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=$state&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true"
 
         /**
+         * `PostToolUseFailure`: a failed tool call (say, Bash exiting non-zero) doesn't end the turn, so
+         * Claude is still thinking. Only an interrupt does, and an interrupted turn fires no `Stop`.
+         */
+        fun toolFailureCommand(): String =
+            "case \"\$(cat)\" in *'\"is_interrupt\":true'*|*'\"is_interrupt\": true'*) S=idle ;; *) S=thinking ;; esac; " +
+                curlCommand("\$S")
+
+        /** One entry in `settings.json`: [event], an optional [matcher] narrowing it, and its [command]. */
+        data class Hook(val event: String, val command: String, val matcher: String? = null)
+
+        /**
+         * Everything we install. The icon must leave "working" only when the turn really ends, and must
+         * not re-enter it afterwards: `Notification` also fires for things like the idle reminder.
+         */
+        @JvmField
+        val HOOKS = listOf(
+            Hook("SessionStart", curlCommand("idle")),
+            Hook("UserPromptSubmit", curlCommand("thinking")),
+            Hook("PreToolUse", curlCommand("tool")),
+            Hook("PostToolUse", curlCommand("thinking")),
+            Hook("PostToolUseFailure", toolFailureCommand()),
+            // Notification matchers compare `notification_type`. Only dialogs wait on the user; the
+            // idle reminder (~1 min after a turn) means Claude is idle, which also heals a stuck icon.
+            Hook("Notification", curlCommand("waiting"), "permission_prompt|elicitation_dialog|elicitation_url_dialog"),
+            Hook("Notification", curlCommand("idle"), "idle_prompt"),
+            Hook("PermissionRequest", curlCommand("waiting")),
+            // Auto-mode denial: the model is told and carries on (it may even retry), the turn goes on.
+            Hook("PermissionDenied", curlCommand("thinking")),
+            Hook("Stop", curlCommand("idle")),
+            Hook("StopFailure", curlCommand("idle")),
+            Hook("SessionEnd", curlCommand("idle")),
+        )
+
+        /**
          * Adds our HTTP hooks to [root], dropping entries from earlier plugin versions so that
          * reinstalling upgrades instead of duplicating, and leaving everything else alone.
          */
@@ -97,8 +131,8 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
             for (event in hooks.keySet().toList()) {
                 dropOurEntries(hooks, event)
             }
-            for ((event, state) in EVENT_TO_STATE) {
-                addHook(hooks, event, curlCommand(state))
+            for (hook in HOOKS) {
+                addHook(hooks, hook)
             }
             return root
         }
@@ -113,30 +147,17 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
             if (kept.isEmpty) hooks.remove(event) else hooks.add(event, kept)
         }
 
-        private fun addHook(hooks: JsonObject, event: String, command: String) {
-            val list = hooks.getAsJsonArray(event) ?: JsonArray().also { hooks.add(event, it) }
+        private fun addHook(hooks: JsonObject, hook: Hook) {
+            val list = hooks.getAsJsonArray(hook.event) ?: JsonArray().also { hooks.add(hook.event, it) }
             val commandObj = JsonObject().apply {
                 addProperty("type", "command")
-                addProperty("command", command)
+                addProperty("command", hook.command)
             }
-            list.add(JsonObject().apply { add("hooks", JsonArray().apply { add(commandObj) }) })
+            list.add(JsonObject().apply {
+                hook.matcher?.let { addProperty("matcher", it) }
+                add("hooks", JsonArray().apply { add(commandObj) })
+            })
         }
-
-        /** Claude hook event -> status parameter. */
-        @JvmField
-        val EVENT_TO_STATE = linkedMapOf(
-            "SessionStart" to "idle",
-            "UserPromptSubmit" to "thinking",
-            "PreToolUse" to "tool",
-            "PostToolUse" to "thinking",
-            "PostToolUseFailure" to "idle",
-            "Notification" to "waiting",
-            "PermissionRequest" to "waiting",
-            "PermissionDenied" to "idle",
-            "Stop" to "idle",
-            "StopFailure" to "idle",
-            "SessionEnd" to "idle",
-        )
 
         /** Written over a legacy `aside-status.sh` so Claude sessions still referencing it don't fail. */
         @JvmField

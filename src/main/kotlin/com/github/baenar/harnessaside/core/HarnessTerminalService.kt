@@ -30,11 +30,11 @@ import javax.swing.SwingUtilities
 class HarnessTerminalService(private val project: Project) {
 
     /**
-     * Opens a new terminal tab running [command].
+     * Opens a new terminal tab running [command], or just the shell when it is null.
      */
     fun openTerminalTab(
         toolWindow: ToolWindow,
-        command: String,
+        command: String?,
         title: String,
         env: Map<String, String> = emptyMap(),
         userData: Map<Key<*>, Any?> = emptyMap(),
@@ -48,7 +48,7 @@ class HarnessTerminalService(private val project: Project) {
 
         val widget = LocalTerminalDirectRunner.createTerminalRunner(project)
             .startShellTerminalWidget(toolWindow.disposable, options, true)
-        widget.sendCommandToExecute(command)
+        command?.let(widget::sendCommandToExecute)
 
         val cm = toolWindow.contentManager
         com.github.baenar.harnessaside.ui.HarnessToolWindowUi.isSwitching = true

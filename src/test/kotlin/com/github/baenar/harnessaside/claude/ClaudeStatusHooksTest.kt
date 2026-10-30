@@ -32,7 +32,7 @@ class ClaudeStatusHooksTest {
         assertTrue(ClaudeStatusHooks(dir).isInstalled())
 
         val hooks = settingsOf(dir).getAsJsonObject("hooks")
-        assertEquals(ClaudeStatusHooks.EVENT_TO_STATE.keys, hooks.keySet())
+        assertEquals(ClaudeStatusHooks.HOOKS.map { it.event }.toSet(), hooks.keySet())
 
         val submitCmd = hookCommands(dir, "UserPromptSubmit").single()
         assertTrue(submitCmd.contains("curl -s -m 2 --connect-timeout 1 -X POST"))
@@ -41,9 +41,6 @@ class ClaudeStatusHooksTest {
         assertTrue(submitCmd.contains("HARNESS_ASIDE_IDE_TOKEN"))
         assertTrue(submitCmd.contains("[ -n \"\$HARNESS_ASIDE_IDE_PORT\" ]"))
 
-        val notificationCmd = hookCommands(dir, "Notification").single()
-        assertTrue(notificationCmd.contains("state=waiting"))
-
         val toolCmd = hookCommands(dir, "PreToolUse").single()
         assertTrue(toolCmd.contains("state=tool"))
 
@@ -51,7 +48,7 @@ class ClaudeStatusHooksTest {
         assertTrue(stopCmd.contains("state=idle"))
 
         val deniedCmd = hookCommands(dir, "PermissionDenied").single()
-        assertTrue(deniedCmd.contains("state=idle"))
+        assertTrue("an auto-mode denial doesn't end the turn", deniedCmd.contains("state=thinking"))
 
         val stopFailureCmd = hookCommands(dir, "StopFailure").single()
         assertTrue(stopFailureCmd.contains("state=idle"))
@@ -120,6 +117,36 @@ class ClaudeStatusHooksTest {
         assertEquals("the old entry must be replaced, not joined", 1, commands.size)
         assertTrue(commands.single().contains("HARNESS_ASIDE_IDE_PORT"))
         assertFalse(commands.single().contains("aside-status.sh"))
+    }
+
+    @Test
+    fun `notifications only wait for dialogs, and the idle reminder means idle`() {
+        val dir = claudeDir()
+        assertTrue(ClaudeStatusHooks(dir).install())
+
+        val byMatcher = settingsOf(dir).getAsJsonObject("hooks").getAsJsonArray("Notification").associate { entry ->
+            val obj = entry.asJsonObject
+            obj.get("matcher")?.asString to obj.getAsJsonArray("hooks").single().asJsonObject.get("command").asString
+        }
+        assertFalse("an unmatched Notification hook fires for every notification type", byMatcher.containsKey(null))
+        val waiting = byMatcher.filterValues { it.contains("state=waiting") }.keys.single()!!.split('|')
+        assertTrue(waiting.contains("permission_prompt"))
+        assertFalse("the idle reminder must never look like a dialog", waiting.contains("idle_prompt"))
+        assertTrue(byMatcher.getValue("idle_prompt").contains("state=idle"))
+    }
+
+    @Test
+    fun `reinstalling replaces an older unmatched Notification hook`() {
+        val dir = claudeDir()
+        Files.createDirectories(dir)
+        val old = ClaudeStatusHooks.curlCommand("waiting").replace("\"", "\\\"")
+        Files.writeString(dir.resolve("settings.json"), """{"hooks":{"Notification":[{"hooks":[{"type":"command","command":"$old"}]}]}}""")
+
+        assertTrue(ClaudeStatusHooks(dir).install())
+
+        val entries = settingsOf(dir).getAsJsonObject("hooks").getAsJsonArray("Notification")
+        assertTrue(entries.all { it.asJsonObject.has("matcher") })
+        assertEquals(ClaudeStatusHooks.HOOKS.count { it.event == "Notification" }, entries.size())
     }
 
     @Test
