@@ -127,7 +127,7 @@ class HarnessLauncherPanel(
             val nameLabel = JBLabel(harness.displayName).apply {
                 font = JBFont.label().asBold()
             }
-            val cmdLabel = JBLabel("Runs `${harness.executable}`").apply {
+            val cmdLabel = JBLabel(if (harness.executable.isEmpty()) "Plain shell" else "Runs `${harness.executable}`").apply {
                 foreground = UIUtil.getContextHelpForeground()
                 font = JBFont.small()
             }
