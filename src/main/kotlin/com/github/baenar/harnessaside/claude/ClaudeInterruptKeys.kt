@@ -24,4 +24,16 @@ internal object ClaudeInterruptKeys {
         KeyEvent.VK_C -> (modifiersEx and InputEvent.CTRL_DOWN_MASK) != 0
         else -> false
     }
+
+    /**
+     * How a key press answers Claude's permission dialog: `1. Yes`, `2. Yes, and don't ask again`,
+     * `3. No` (Esc is an interrupt, see [isInterrupt]). True approves, false declines, null is
+     * anything else. Only meaningful while a dialog is open; callers check that first.
+     */
+    fun permissionAnswer(keyCode: Int, keyChar: Char): Boolean? = when {
+        keyCode == KeyEvent.VK_ENTER -> true // the highlighted option, "Yes" unless moved
+        keyChar in "12yY" -> true
+        keyChar in "3nN" -> false
+        else -> null
+    }
 }
