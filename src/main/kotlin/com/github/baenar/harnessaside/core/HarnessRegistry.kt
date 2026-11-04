@@ -2,6 +2,7 @@ package com.github.baenar.harnessaside.core
 
 import com.github.baenar.harnessaside.antigravity.AntigravityHarness
 import com.github.baenar.harnessaside.claude.ClaudeHarness
+import com.github.baenar.harnessaside.opencode.OpenCodeHarness
 
 /**
  * Registry of supported AI coding harnesses.
@@ -14,6 +15,7 @@ object HarnessRegistry {
         TerminalHarness.id to TerminalHarness,
         ClaudeHarness.id to ClaudeHarness,
         AntigravityHarness.id to AntigravityHarness,
+        OpenCodeHarness.id to OpenCodeHarness,
     )
 
     /** All currently registered harnesses. */

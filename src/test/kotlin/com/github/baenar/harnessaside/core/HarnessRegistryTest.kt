@@ -34,7 +34,7 @@ class HarnessRegistryTest {
 
     @Test
     fun `plain terminal is listed first, above Claude`() {
-        assertEquals(listOf("terminal", "claude", "antigravity"), HarnessRegistry.registered.map { it.id })
+        assertEquals(listOf("terminal", "claude", "antigravity", "opencode"), HarnessRegistry.registered.map { it.id })
         assertEquals("", HarnessRegistry.find("terminal")?.executable)
     }
 }

@@ -33,7 +33,8 @@ still glyph.
 | macOS    | **Unverified** — prolly safe to run, not tested                                 |
 
 Status hooks last verified by hand against **Antigravity CLI 1.4.6** (WSL) and **1.4.4** (native Windows),
-and **Claude Code 2.1.309** (WSL).
+and **Claude Code 2.1.309** (WSL). OpenCode has no shell hooks: launching it writes a plugin to
+`~/.config/opencode/plugins/harness-aside-status.js`, written against **OpenCode 1.19.3**.
 
 IDEs: developed and run against IntelliJ IDEA Community. PyCharm should load it — the
 plugin depends only on the platform and the terminal — but that is untested too.
