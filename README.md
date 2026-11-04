@@ -33,7 +33,8 @@ still glyph.
 | macOS    | **Unverified** — prolly safe to run, not tested                                 |
 
 Status hooks last verified by hand against **Antigravity CLI 1.4.6** (WSL) and **1.4.4** (native Windows),
-and **Claude Code 2.1.309** (WSL).
+and **Claude Code 2.1.309** (WSL). OpenCode has no shell hooks: launching it writes a plugin to
+`~/.config/opencode/plugins/harness-aside-status.js`, written against **OpenCode 1.19.3**.
 
 IDEs: developed and run against IntelliJ IDEA Community. PyCharm should load it — the
 plugin depends only on the platform and the terminal — but that is untested too.
@@ -58,8 +59,8 @@ From a WSL shell, point Gradle at a JDK: `JAVA_HOME=~/.jdks/openjdk-26.0.2 ./gra
 
 CI (`.github/workflows/build.yml`) runs the same three tasks — `buildPlugin`, `check`, `verifyPlugin` —
 and uploads the installable zip as a workflow artifact (per commit, 90-day expiry, login required).
-Every direct push to `main` triggers it. Pull requests are tested only when the **`test ready`** label is added.
-New commits on a labelled PR don't trigger a run, so remove the label and add it again to test the latest commit.
+Every direct push to `main` triggers it. Pull requests are tested only while they carry the **`test ready`** label:
+every time the label is added, and on every push to a PR that already has it.
 
 ## Releasing
 

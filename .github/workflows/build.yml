@@ -1,7 +1,7 @@
 # Builds the plugin, runs tests, and runs the IntelliJ Plugin Verifier.
-# Triggered on pushes to 'main', manually, and on a pull request only once it is labelled "test ready".
-# Pushing to a PR runs nothing; to test the latest commit, remove the label and add it again —
-# every time the label is added the whole pipeline runs from scratch on the PR's current head.
+# Triggered on pushes to 'main', manually, and on a pull request only while it is labelled "test ready":
+# every time the label is added, and on every push to a PR that already has it. A PR without the label
+# runs nothing; each run starts from scratch on the PR's current head and cancels the PR's older run.
 #
 # Tests run on Linux *and* Windows on purpose: AntigravityHookExecutionTest executes the generated
 # hook commands with the shell the CLI uses on that OS (`/bin/sh` or `cmd.exe`), so the Windows leg
@@ -12,13 +12,13 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    types: [ labeled ]
+    types: [ labeled, synchronize ]
   workflow_dispatch:
 
 concurrency:
   # Adding any other label also triggers this workflow (and runs nothing), so it gets its own group:
-  # it must never cancel a "test ready" run. Re-adding "test ready" does cancel the older run.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request' && github.event.label.name != 'test ready' && '-other-label' || '' }}
+  # it must never cancel a "test ready" run. Re-adding "test ready" or pushing does cancel the older run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'test ready' && '-other-label' || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -29,7 +29,10 @@ jobs:
   # `build` and `icons` are the roots; `test` and `verify` need `build`, so they skip with it.
   build:
     name: Build
-    if: github.event_name != 'pull_request' || github.event.label.name == 'test ready'
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'test ready') ||
+      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'test ready'))
     runs-on: ubuntu-latest
     steps:
       - name: Maximize Build Space
@@ -115,7 +118,10 @@ jobs:
 
   icons:
     name: Icons match their generator
-    if: github.event_name != 'pull_request' || github.event.label.name == 'test ready'
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'test ready') ||
+      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'test ready'))
     runs-on: ubuntu-latest
     steps:
       - name: Fetch Sources

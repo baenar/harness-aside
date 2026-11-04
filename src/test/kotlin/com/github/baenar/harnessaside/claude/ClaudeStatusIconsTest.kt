@@ -55,6 +55,7 @@ class ClaudeStatusIconsTest {
     fun `brand icons exist on the classpath`() {
         assertNotNull("missing claude icon", javaClass.getResource("/icons/claude.svg"))
         assertNotNull("missing antigravity icon", javaClass.getResource("/icons/antigravity.svg"))
+        assertNotNull("missing opencode icon", javaClass.getResource("/icons/opencode.svg"))
     }
 
     @Test

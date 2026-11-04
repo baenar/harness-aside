@@ -121,8 +121,9 @@ class HarnessTerminalService(private val project: Project) {
         val token = server.token
 
         val inherited = inheritedWslEnv?.removeSuffix(":").orEmpty()
-        val forwarded = "FORCE_HYPERLINK/u:HARNESS_ASIDE_IDE_PORT/u:HARNESS_ASIDE_IDE_TOKEN/u:HARNESS_IDE_PORT/u:HARNESS_IDE_TOKEN/u" +
-            ":CLAUDE_CODE_SSE_PORT/u:ENABLE_IDE_INTEGRATION/u"
+        // No `/u` flag: a Windows exe started from the distro (opencode.exe via PATH interop) needs them too.
+        val forwarded = "FORCE_HYPERLINK:HARNESS_ASIDE_IDE_PORT:HARNESS_ASIDE_IDE_TOKEN:HARNESS_IDE_PORT:HARNESS_IDE_TOKEN" +
+            ":CLAUDE_CODE_SSE_PORT:ENABLE_IDE_INTEGRATION"
         val wslEnv = if (inherited.isEmpty()) forwarded else "$inherited:$forwarded"
 
         return mapOf(
