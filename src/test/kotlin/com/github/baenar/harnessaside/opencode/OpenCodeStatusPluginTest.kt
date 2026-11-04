@@ -68,17 +68,18 @@ class OpenCodeStatusPluginTest {
     private fun run(vararg steps: String, port: Int? = server.port) {
         val home = tmp.newFolder().path
         OpenCodeStatusPlugin.install(home)
-        val plugin = tmp.root.toPath().resolve("plugin.mjs") // .mjs: older node won't load ESM from a .js
-        Files.copy(OpenCodeStatusPlugin.pluginDir(home).resolve(OpenCodeStatusPlugin.FILE), plugin)
-        val script = """
-            const { HarnessAsideStatus } = await import(require("url").pathToFileURL(process.argv[1]))
-            const hooks = await HarnessAsideStatus({})
-            for (const step of JSON.parse(process.argv[2]))
-              step.startsWith("{") ? await hooks.event?.({ event: JSON.parse(step) }) : await hooks[step]?.({}, {})
-        """.trimIndent()
+        val dir = tmp.root.toPath()
+        // .mjs: older node won't load ESM from a .js
+        Files.copy(OpenCodeStatusPlugin.pluginDir(home).resolve(OpenCodeStatusPlugin.FILE), dir.resolve("plugin.mjs"))
+        // A file, not `node -e`: on Windows Java passes `"` inside arguments unescaped (see HookShell).
         val json = steps.joinToString(",", "[", "]") { JsonPrimitive(it).toString() }
-        val builder = ProcessBuilder("node", "--input-type=commonjs", "-e", "(async () => { $script })()", plugin.toString(), json)
-            .redirectErrorStream(true)
+        val driver = Files.writeString(dir.resolve("driver.mjs"), """
+            import { HarnessAsideStatus } from "./plugin.mjs"
+            const hooks = await HarnessAsideStatus({})
+            for (const step of $json)
+              step.startsWith("{") ? await hooks.event?.({ event: JSON.parse(step) }) : await hooks[step]?.({}, {})
+        """.trimIndent())
+        val builder = ProcessBuilder("node", driver.toString()).redirectErrorStream(true)
         builder.environment().remove("HARNESS_ASIDE_IDE_PORT")
         if (port != null) {
             builder.environment()["HARNESS_ASIDE_IDE_PORT"] = port.toString()
