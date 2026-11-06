@@ -1,6 +1,5 @@
 package com.github.baenar.harnessaside.claude
 
-import com.github.baenar.harnessaside.core.TOOL_WINDOW_ID
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -76,7 +75,6 @@ class ClaudeTerminalService(private val project: Project) {
             content.putUserData(WIDGET_KEY, widget)
             content.putUserData(com.github.baenar.harnessaside.core.HarnessTerminalService.WIDGET_KEY, widget)
             content.putUserData(com.github.baenar.harnessaside.core.HARNESS_ID_KEY, "claude")
-            content.putUserData(SESSION_KEY, sessionId)
 
             val status = project.service<ClaudeStatusService>()
             // Scoped to this tab: the key watcher must go when the tab does.
@@ -94,26 +92,6 @@ class ClaudeTerminalService(private val project: Project) {
         } finally {
             com.github.baenar.harnessaside.ui.HarnessToolWindowUi.isSwitching = false
         }
-    }
-
-    /** The terminal in the currently selected tab, or null when there is none. */
-    fun activeWidget(toolWindow: ToolWindow): TerminalWidget? =
-        toolWindow.contentManager.selectedContent?.getUserData(WIDGET_KEY)
-
-    /**
-     * Types [text] into the active terminal without submitting it (no trailing newline),
-     * so the user can add to it before pressing Enter, then focuses the terminal.
-     */
-    fun sendText(toolWindow: ToolWindow, text: String) {
-        val widget = activeWidget(toolWindow) ?: return
-        widget.ttyConnectorAccessor.executeWithTtyConnector { connector ->
-            try {
-                connector.write(text)
-            } catch (_: Exception) {
-                // pty already closed — nothing to type into
-            }
-        }
-        widget.requestFocus()
     }
 
     /**
@@ -134,11 +112,7 @@ class ClaudeTerminalService(private val project: Project) {
 
     companion object {
         val WIDGET_KEY: Key<TerminalWidget> = Key.create<TerminalWidget>("claude.aside.terminalWidget")
-        val SESSION_KEY: Key<String> = Key.create<String>("claude.aside.sessionId")
 
         fun hasTerminal(content: Content?): Boolean = content?.getUserData(WIDGET_KEY) != null
-
-        /** The Claude session running in [content], when the plugin launched it with a known id. */
-        fun sessionIdOf(content: Content?): String? = content?.getUserData(SESSION_KEY)
     }
 }

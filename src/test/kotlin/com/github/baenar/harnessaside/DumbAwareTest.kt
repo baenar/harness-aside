@@ -3,7 +3,6 @@ package com.github.baenar.harnessaside
 import com.github.baenar.harnessaside.claude.DiagnoseStatusAction
 import com.github.baenar.harnessaside.claude.EnableStatusHooksAction
 import com.github.baenar.harnessaside.claude.RemoveClaudeTabAction
-import com.github.baenar.harnessaside.claude.RestartClaudeTabAction
 import com.intellij.openapi.project.DumbAware
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,7 +18,6 @@ class DumbAwareTest {
         val classes = listOf(
             HarnessToolWindowFactory::class,
             SendSelectionToClaudeAction::class,
-            RestartClaudeTabAction::class,
             RemoveClaudeTabAction::class,
             DiagnoseStatusAction::class,
             EnableStatusHooksAction::class,

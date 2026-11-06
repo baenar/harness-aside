@@ -3,7 +3,6 @@ package com.github.baenar.harnessaside
 import com.github.baenar.harnessaside.claude.DiagnoseStatusAction
 import com.github.baenar.harnessaside.claude.EnableStatusHooksAction
 import com.github.baenar.harnessaside.claude.RemoveClaudeTabAction
-import com.github.baenar.harnessaside.claude.RestartClaudeTabAction
 import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.DumbAware
@@ -25,12 +24,7 @@ import com.intellij.ui.content.ContentManagerListener
 class HarnessToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        toolWindow.setTitleActions(
-            listOf(
-                RestartClaudeTabAction(toolWindow),
-                RemoveClaudeTabAction(toolWindow),
-            )
-        )
+        toolWindow.setTitleActions(listOf(RemoveClaudeTabAction(toolWindow)))
         toolWindow.setAdditionalGearActions(
             DefaultActionGroup(EnableStatusHooksAction(project), DiagnoseStatusAction(project))
         )

@@ -16,7 +16,7 @@
 ### Harness Launcher & Tab Lifecycle
 * **Launcher Panel (`HarnessLauncherPanel`)**: An empty-state Swing UI displayed when no harness is active. Lists registered harnesses from `HarnessRegistry` with one-click launch buttons.
 * **Single-Tab Management (`HarnessToolWindowUi`)**: Enforces that the tool window contains either the launcher panel or exactly one active interactive terminal session. Switching harnesses safely terminates the current process and returns to the launcher.
-* **Session Actions**: Toolbar actions to switch harness, restart the current session, or remove the active tab.
+* **Session Actions**: One title-bar action (circular arrow) ends the session and returns to the launcher.
 
 ### Claude Code Harness Integration
 * **CLI Execution (`ClaudeHarness`, `ClaudeTerminalService`)**: Launches or resumes Claude Code CLI sessions (`claude` or `claude -c`) inside the embedded JetBrains terminal widget.

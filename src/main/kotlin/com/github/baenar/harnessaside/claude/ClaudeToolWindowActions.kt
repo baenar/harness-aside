@@ -13,37 +13,9 @@ import com.intellij.openapi.wm.ToolWindow
 
 import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
 
-/** Title-bar action: close the current tab and reopen it resuming the same session. */
-class RestartClaudeTabAction(private val toolWindow: ToolWindow) :
-    AnAction("Restart Tab", "Close this tab and start Claude again resuming its session", AllIcons.Actions.Restart), DumbAware {
-
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val cm = toolWindow.contentManager
-        val closed = cm.selectedContent
-        val harnessId = closed?.getUserData(com.github.baenar.harnessaside.core.HARNESS_ID_KEY) ?: "claude"
-        val harness = com.github.baenar.harnessaside.core.HarnessRegistry.find(harnessId)
-            ?: com.github.baenar.harnessaside.core.HarnessRegistry.default
-        val sessionId = ClaudeTerminalService.sessionIdOf(closed)
-        HarnessToolWindowUi.isSwitching = true
-        try {
-            closed?.let { cm.removeContent(it, true) }
-            harness.openSession(project, toolWindow, true, sessionId)
-        } finally {
-            HarnessToolWindowUi.isSwitching = false
-        }
-    }
-
-    override fun update(e: AnActionEvent) {
-        e.presentation.isEnabled = HarnessToolWindowUi.hasActiveTerminal(toolWindow)
-    }
-
-    override fun getActionUpdateThread() = ActionUpdateThread.BGT
-}
-
 /** Title-bar action: close the current tab, terminating its terminal (pty) and returning to launcher. */
 class RemoveClaudeTabAction(private val toolWindow: ToolWindow) :
-    AnAction("Close Tab", "Close this tab and return to harness launcher", AllIcons.Actions.Close), DumbAware {
+    AnAction("Back to Launcher", "End this session and return to the harness launcher", AllIcons.Actions.Restart), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
         val cm = toolWindow.contentManager

@@ -10,6 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.nio.file.Files
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
@@ -38,7 +39,7 @@ class OpenCodeStatusPluginTest {
 
     @Test
     fun `a turn with a permission prompt and a subagent ends idle`() {
-        run(
+        val output = run(
             """{"type":"session.status","properties":{"sessionID":"main","status":{"type":"busy"}}}""",
             "tool.execute.before",
             """{"type":"permission.asked","properties":{"sessionID":"main"}}""",
@@ -49,6 +50,7 @@ class OpenCodeStatusPluginTest {
             """{"type":"session.status","properties":{"sessionID":"main","status":{"type":"idle"}}}""",
         )
         assertEquals(
+            output,
             listOf(
                 HarnessStatus.THINKING, HarnessStatus.EXECUTING_TOOL, HarnessStatus.WAITING, HarnessStatus.THINKING,
                 HarnessStatus.THINKING, HarnessStatus.THINKING, // the subagent finishing is not the turn finishing
@@ -64,8 +66,11 @@ class OpenCodeStatusPluginTest {
         assertEquals(emptyList<HarnessStatus>(), received)
     }
 
-    /** Each step is a hook name or an event JSON for the `event` hook. Node exits once every request is done. */
-    private fun run(vararg steps: String, port: Int? = server.port) {
+    /**
+     * Each step is a hook name or an event JSON for the `event` hook. Node exits once every request is done;
+     * returns what it printed, which names any request the plugin dropped.
+     */
+    private fun run(vararg steps: String, port: Int? = server.port): String {
         val home = tmp.newFolder().path
         OpenCodeStatusPlugin.install(home)
         val dir = tmp.root.toPath()
@@ -75,6 +80,16 @@ class OpenCodeStatusPluginTest {
         val json = steps.joinToString(",", "[", "]") { JsonPrimitive(it).toString() }
         val driver = Files.writeString(dir.resolve("driver.mjs"), """
             import { HarnessAsideStatus } from "./plugin.mjs"
+            const port = process.env.HARNESS_ASIDE_IDE_PORT
+            if (port) await fetch(`http://127.0.0.1:${'$'}{port}/health`).then((r) => r.text()).catch((e) => console.log(`warm-up failed: ${'$'}{e}`))
+            const send = globalThis.fetch
+            globalThis.fetch = async (url, init) => {
+              const start = performance.now()
+              try { return await send(url, init) } catch (e) {
+                console.log(`dropped ${'$'}{url} after ${'$'}{Math.round(performance.now() - start)} ms: ${'$'}{e.name} ${'$'}{e.cause?.code ?? e.message}`)
+                throw e
+              }
+            }
             const hooks = await HarnessAsideStatus({})
             for (const step of $json)
               step.startsWith("{") ? await hooks.event?.({ event: JSON.parse(step) }) : await hooks[step]?.({}, {})
@@ -86,11 +101,13 @@ class OpenCodeStatusPluginTest {
             builder.environment()["HARNESS_ASIDE_IDE_TOKEN"] = server.token
         }
         val process = builder.start()
-        val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
-        if (!process.waitFor(10, TimeUnit.SECONDS)) {
+        val output = CompletableFuture.supplyAsync { process.inputStream.readAllBytes().toString(Charsets.UTF_8) }
+        if (!process.waitFor(30, TimeUnit.SECONDS)) {
             process.destroyForcibly()
-            throw AssertionError("node did not exit: $output")
+            throw AssertionError("node did not exit")
         }
-        assertEquals("node failed: $output", 0, process.exitValue())
+        val printed = output.get(5, TimeUnit.SECONDS)
+        assertEquals("node failed: $printed", 0, process.exitValue())
+        return printed
     }
 }
