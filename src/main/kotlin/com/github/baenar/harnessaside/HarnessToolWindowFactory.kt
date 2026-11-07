@@ -8,6 +8,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.impl.content.ToolWindowContentUi
 import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
 
@@ -23,6 +24,8 @@ import com.intellij.ui.content.ContentManagerListener
 class HarnessToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        // The header text includes the tool window's name (see HarnessToolWindowUi.show).
+        toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
         toolWindow.setTitleActions(listOf(EndSessionAction(toolWindow)))
         toolWindow.setAdditionalGearActions(DefaultActionGroup(DiagnoseStatusAction(project)))
 

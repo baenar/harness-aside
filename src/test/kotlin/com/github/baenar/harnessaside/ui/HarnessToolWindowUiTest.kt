@@ -23,7 +23,7 @@ class HarnessToolWindowUiTest : BasePlatformTestCase() {
         HarnessToolWindowUi.show(toolWindow, JPanel(), "second")
 
         assertEquals(1, cm.contentCount)
-        assertEquals("second", cm.selectedContent?.displayName)
+        assertEquals("<html><b>Harness Aside</b> second</html>", cm.selectedContent?.displayName)
         assertFalse("reaching zero would bring the launcher back over the new session", emptied)
     }
 }
