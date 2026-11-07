@@ -31,7 +31,7 @@ class ClaudeHookExecutionTest {
     @Before
     fun setUp() {
         server.statusListener = { received.add(it) }
-        server.start()
+        server.ensureStarted()
         dir = tmp.newFolder(".claude").toPath()
         ClaudeStatusHooks(dir).install()
     }

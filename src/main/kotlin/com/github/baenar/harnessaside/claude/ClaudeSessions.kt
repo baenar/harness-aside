@@ -16,7 +16,9 @@ import kotlin.io.path.name
 object ClaudeSessions {
 
     /** Encodes an absolute project path the way Claude names its `projects/` subdirectory. */
-    fun encodeProjectPath(path: String): String = path.replace(Regex("[^A-Za-z0-9]"), "-")
+    fun encodeProjectPath(path: String): String = path.replace(NON_ALPHANUMERIC, "-")
+
+    private val NON_ALPHANUMERIC = Regex("[^A-Za-z0-9]")
 
     /** A `$HOME` and a project path as *Claude* sees them; the IDE's need not match. */
     data class Storage(val userHome: String, val projectPath: String)
@@ -35,8 +37,7 @@ object ClaudeSessions {
      */
     fun storage(ideUserHome: String, ideProjectPath: String): Storage {
         val path = ideProjectPath.replace('\\', '/')
-        val prefix = WSL_PREFIXES.firstOrNull { path.startsWith(it, ignoreCase = true) }
-            ?: return Storage(ideUserHome, ideProjectPath)
+        val prefix = wslPrefix(path) ?: return Storage(ideUserHome, ideProjectPath)
 
         val rest = path.substring(prefix.length)
         val distro = rest.substringBefore('/')
@@ -53,10 +54,10 @@ object ClaudeSessions {
         else WSL_HOME.matchEntire(linuxPath)?.groupValues?.get(1)
 
     /** True for a `\\wsl$\distro\...` or `\\wsl.localhost\distro\...` path. */
-    fun isWsl(path: String): Boolean {
-        val normalized = path.replace('\\', '/')
-        return WSL_PREFIXES.any { normalized.startsWith(it, ignoreCase = true) }
-    }
+    fun isWsl(path: String): Boolean = wslPrefix(path.replace('\\', '/')) != null
+
+    private fun wslPrefix(slashPath: String): String? =
+        WSL_PREFIXES.firstOrNull { slashPath.startsWith(it, ignoreCase = true) }
 
     /** Both spellings Windows mounts a distro under; `wsl.localhost` is the newer one. */
     private val WSL_PREFIXES = listOf("//wsl\$/", "//wsl.localhost/")
@@ -72,18 +73,8 @@ object ClaudeSessions {
         return Paths.get(home, ".claude", "projects", encodeProjectPath(path))
     }
 
-    /**
-     * The id (file name without extension) of the most recently modified session for the
-     * project, or null when the directory has no `*.jsonl` files (or does not exist).
-     */
-    fun latestSessionId(userHome: String, projectPath: String): String? {
-        val dir = sessionsDir(userHome, projectPath)
-        if (!Files.isDirectory(dir)) return null
-        return Files.list(dir).use { stream ->
-            stream.filter { it.name.endsWith(".jsonl") }
-                .max(compareBy { Files.getLastModifiedTime(it) })
-                .map { it.name.removeSuffix(".jsonl") }
-                .orElse(null)
-        }
-    }
+    /** True when the project has a session to continue; a missing or unreadable directory means it hasn't. */
+    fun hasSessions(userHome: String, projectPath: String): Boolean = runCatching {
+        Files.list(sessionsDir(userHome, projectPath)).use { files -> files.anyMatch { it.name.endsWith(".jsonl") } }
+    }.getOrDefault(false)
 }

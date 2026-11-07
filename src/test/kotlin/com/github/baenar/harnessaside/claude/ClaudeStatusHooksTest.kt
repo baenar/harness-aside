@@ -1,5 +1,6 @@
 package com.github.baenar.harnessaside.claude
 
+import com.github.baenar.harnessaside.core.postStatusCommand
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
@@ -8,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 
 /** Installing the push-based HTTP hooks into `.claude/settings.json`. */
 class ClaudeStatusHooksTest {
@@ -27,9 +29,7 @@ class ClaudeStatusHooksTest {
     @Test
     fun `install writes curl HTTP commands for every hook event`() {
         val dir = claudeDir()
-        assertFalse(ClaudeStatusHooks(dir).isInstalled())
         assertTrue(ClaudeStatusHooks(dir).install())
-        assertTrue(ClaudeStatusHooks(dir).isInstalled())
 
         val hooks = settingsOf(dir).getAsJsonObject("hooks")
         assertEquals(ClaudeStatusHooks.HOOKS.map { it.event }.toSet(), hooks.keySet())
@@ -139,7 +139,7 @@ class ClaudeStatusHooksTest {
     fun `reinstalling replaces an older unmatched Notification hook`() {
         val dir = claudeDir()
         Files.createDirectories(dir)
-        val old = ClaudeStatusHooks.curlCommand("waiting").replace("\"", "\\\"")
+        val old = postStatusCommand("waiting").replace("\"", "\\\"")
         Files.writeString(dir.resolve("settings.json"), """{"hooks":{"Notification":[{"hooks":[{"type":"command","command":"$old"}]}]}}""")
 
         assertTrue(ClaudeStatusHooks(dir).install())
@@ -150,28 +150,15 @@ class ClaudeStatusHooksTest {
     }
 
     @Test
-    fun `install cleans up legacy script and status files`() {
+    fun `reinstalling leaves an unchanged file untouched`() {
         val dir = claudeDir()
-        Files.createDirectories(dir)
-        val legacyScript = dir.resolve(ClaudeStatusHooks.SCRIPT_FILE)
-        val legacyStatus = dir.resolve(ClaudeStatusHooks.STATUS_DIR)
-        Files.writeString(legacyScript, "#!/bin/sh\nexit 1")
-        Files.writeString(legacyStatus, "thinking")
+        assertTrue(ClaudeStatusHooks(dir).install())
+        val settings = dir.resolve("settings.json")
+        val past = FileTime.fromMillis(1_000)
+        Files.setLastModifiedTime(settings, past)
 
         assertTrue(ClaudeStatusHooks(dir).install())
-        val scriptContent = Files.readString(legacyScript)
-        assertTrue("must neutralize legacy script to exit 0", scriptContent.contains("exit 0"))
-        assertFalse(Files.isRegularFile(legacyStatus))
-    }
-
-    @Test
-    fun `isInstalled copes with a missing or unreadable settings file`() {
-        val dir = claudeDir()
-        assertFalse("nothing there at all", ClaudeStatusHooks(dir).isInstalled())
-
-        Files.createDirectories(dir)
-        Files.writeString(dir.resolve("settings.json"), "{ not json")
-        assertFalse("must not throw on a broken file", ClaudeStatusHooks(dir).isInstalled())
+        assertEquals("Claude reloads this file whenever it changes", past, Files.getLastModifiedTime(settings))
     }
 
     @Test

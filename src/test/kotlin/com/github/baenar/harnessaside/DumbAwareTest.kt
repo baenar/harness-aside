@@ -1,8 +1,7 @@
 package com.github.baenar.harnessaside
 
-import com.github.baenar.harnessaside.claude.DiagnoseStatusAction
-import com.github.baenar.harnessaside.claude.EnableStatusHooksAction
-import com.github.baenar.harnessaside.claude.RemoveClaudeTabAction
+import com.github.baenar.harnessaside.ui.DiagnoseStatusAction
+import com.github.baenar.harnessaside.ui.EndSessionAction
 import com.intellij.openapi.project.DumbAware
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,10 +16,9 @@ class DumbAwareTest {
     fun `tool window and every action stay usable during indexing`() {
         val classes = listOf(
             HarnessToolWindowFactory::class,
-            SendSelectionToClaudeAction::class,
-            RemoveClaudeTabAction::class,
+            SendSelectionToHarnessAction::class,
+            EndSessionAction::class,
             DiagnoseStatusAction::class,
-            EnableStatusHooksAction::class,
         )
         for (cls in classes) {
             assertTrue("${cls.simpleName} must implement DumbAware", DumbAware::class.java.isAssignableFrom(cls.java))

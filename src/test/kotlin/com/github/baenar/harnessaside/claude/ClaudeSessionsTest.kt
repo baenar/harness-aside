@@ -1,7 +1,7 @@
 package com.github.baenar.harnessaside.claude
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -34,28 +34,22 @@ class ClaudeSessionsTest {
     }
 
     @Test
-    fun `latestSessionId returns null when the directory is missing`() {
-        assertNull(ClaudeSessions.latestSessionId("/no/such/home", "/no/such/proj"))
+    fun `a project without a sessions directory has nothing to continue`() {
+        assertFalse(ClaudeSessions.hasSessions("/no/such/home", "/no/such/proj"))
     }
 
     @Test
-    fun `latestSessionId returns the newest jsonl file, ignoring non-session entries`() {
+    fun `only a jsonl file counts as a session`() {
         val home = Files.createTempDirectory("aside-home")
         val projectPath = "/tmp/proj"
         val dir = ClaudeSessions.sessionsDir(home.toString(), projectPath)
-        Files.createDirectories(dir)
-
-        val older = dir.resolve("older-session.jsonl")
-        val newer = dir.resolve("newer-session.jsonl")
-        Files.writeString(older, "{}")
-        Files.writeString(newer, "{}")
-        Files.setLastModifiedTime(older, java.nio.file.attribute.FileTime.fromMillis(1_000))
-        Files.setLastModifiedTime(newer, java.nio.file.attribute.FileTime.fromMillis(2_000))
-        // A non-session entry that must be ignored (the dir may hold e.g. memory/).
+        // Non-session entries that must be ignored (the dir may hold e.g. memory/).
         Files.createDirectories(dir.resolve("memory"))
         Files.writeString(dir.resolve("notes.txt"), "ignore me")
+        assertFalse(ClaudeSessions.hasSessions(home.toString(), projectPath))
 
-        assertEquals("newer-session", ClaudeSessions.latestSessionId(home.toString(), projectPath))
+        Files.writeString(dir.resolve("some-session.jsonl"), "{}")
+        assertTrue(ClaudeSessions.hasSessions(home.toString(), projectPath))
     }
 
     // ---------------------------------------------------------------- WSL projects

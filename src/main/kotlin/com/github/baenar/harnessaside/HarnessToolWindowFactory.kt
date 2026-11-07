@@ -1,8 +1,7 @@
 package com.github.baenar.harnessaside
 
-import com.github.baenar.harnessaside.claude.DiagnoseStatusAction
-import com.github.baenar.harnessaside.claude.EnableStatusHooksAction
-import com.github.baenar.harnessaside.claude.RemoveClaudeTabAction
+import com.github.baenar.harnessaside.ui.DiagnoseStatusAction
+import com.github.baenar.harnessaside.ui.EndSessionAction
 import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.DumbAware
@@ -24,15 +23,13 @@ import com.intellij.ui.content.ContentManagerListener
 class HarnessToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        toolWindow.setTitleActions(listOf(RemoveClaudeTabAction(toolWindow)))
-        toolWindow.setAdditionalGearActions(
-            DefaultActionGroup(EnableStatusHooksAction(project), DiagnoseStatusAction(project))
-        )
+        toolWindow.setTitleActions(listOf(EndSessionAction(toolWindow)))
+        toolWindow.setAdditionalGearActions(DefaultActionGroup(DiagnoseStatusAction(project)))
 
-        // Automatically return to the launcher whenever the active session tab is closed
+        // Automatically return to the launcher whenever the active session ends
         toolWindow.contentManager.addContentManagerListener(object : ContentManagerListener {
             override fun contentRemoved(event: ContentManagerEvent) {
-                if (!HarnessToolWindowUi.isSwitching && toolWindow.contentManager.contentCount == 0 && !project.isDisposed) {
+                if (toolWindow.contentManager.contentCount == 0 && !project.isDisposed) {
                     HarnessToolWindowUi.showLauncher(project, toolWindow)
                 }
             }

@@ -17,17 +17,15 @@ import com.intellij.openapi.wm.ToolWindowManager
  * Editor action: inserts a reference to the current file (and selected line range) into
  * the active harness terminal as `@path/to/file#Lx-Ly`, without submitting it.
  */
-open class SendSelectionToHarnessAction : AnAction(), DumbAware {
+class SendSelectionToHarnessAction : AnAction(), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        val editor = e.getData(CommonDataKeys.EDITOR)
-
-        val reference = buildReference(project, file, editor)
+        val reference = buildReference(project, file, e.getData(CommonDataKeys.EDITOR))
         val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return
 
-        // activate() creates the first tab (via the factory) if none exists yet, then sends.
+        // activate() creates the tool window's content (via the factory) if it doesn't exist yet.
         toolWindow.activate { project.service<HarnessTerminalService>().sendText(toolWindow, "$reference ") }
     }
 
@@ -38,25 +36,15 @@ open class SendSelectionToHarnessAction : AnAction(), DumbAware {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun buildReference(project: Project, file: VirtualFile, editor: Editor?): String {
-        val ref = StringBuilder("@").append(relativePath(project, file))
-        val selection = editor?.selectionModel
-        if (selection != null && selection.hasSelection()) {
-            val doc = editor.document
-            val start = doc.getLineNumber(selection.selectionStart) + 1
-            val end = doc.getLineNumber(selection.selectionEnd) + 1
-            if (start == end) ref.append("#L").append(start)
-            else ref.append("#L").append(start).append('-').append(end)
-        }
-        return ref.toString()
+        val path = relativePath(project, file)
+        val selection = editor?.selectionModel?.takeIf { it.hasSelection() } ?: return "@$path"
+        val start = editor.document.getLineNumber(selection.selectionStart) + 1
+        val end = editor.document.getLineNumber(selection.selectionEnd) + 1
+        return if (start == end) "@$path#L$start" else "@$path#L$start-$end"
     }
 
     private fun relativePath(project: Project, file: VirtualFile): String {
         val base = project.basePath
-        val path = file.path
-        return if (base != null && path.startsWith(base)) path.substring(base.length).trimStart('/') else file.name
+        return if (base != null && file.path.startsWith("$base/")) file.path.removePrefix("$base/") else file.name
     }
 }
-
-/** Legacy alias retained for plugin.xml backward compatibility. */
-class SendSelectionToClaudeAction : SendSelectionToHarnessAction()
-

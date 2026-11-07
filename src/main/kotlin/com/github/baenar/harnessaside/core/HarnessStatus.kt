@@ -1,26 +1,20 @@
 package com.github.baenar.harnessaside.core
 
-/**
- * Unified status states for AI coding harnesses running in the tool window.
- */
+/** What a harness running in the tool window is doing. */
 enum class HarnessStatus(val id: String) {
-    /** Harness is waiting for user input or idle. */
+    /** Waiting for the user's next prompt. */
     IDLE("idle"),
 
-    /** Agent model is generating a response or reasoning. */
+    /** Generating a response or reasoning. */
     THINKING("thinking"),
 
-    /** Agent is blocked waiting for user confirmation or permission. */
+    /** Blocked on the user's confirmation or permission. */
     WAITING("waiting"),
 
-    /** Harness is executing a tool or shell command. */
-    EXECUTING_TOOL("tool"),
-
-    /** Harness encountered an error. */
-    ERROR("error");
+    /** Running a tool or shell command. */
+    EXECUTING_TOOL("tool");
 
     companion object {
-        fun fromId(id: String): HarnessStatus? =
-            entries.firstOrNull { it.id.equals(id.trim(), ignoreCase = true) }
+        fun fromId(id: String?): HarnessStatus? = entries.firstOrNull { it.id == id }
     }
 }

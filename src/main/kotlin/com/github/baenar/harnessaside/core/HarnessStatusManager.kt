@@ -1,14 +1,11 @@
 package com.github.baenar.harnessaside.core
 
 import com.github.baenar.harnessaside.claude.ClaudeInterruptKeys
-import com.github.baenar.harnessaside.claude.ClaudeStatusIcons
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindowManager
@@ -21,9 +18,10 @@ import javax.swing.SwingUtilities
 import javax.swing.Timer
 
 /**
- * Project service managing status presentation on the tool window button and user notifications.
+ * Project service showing the harness status on the tool window button.
  *
- * Driven by push events from [HarnessStatusServer] and optimistic keyboard interrupts.
+ * Driven by push events from [HarnessStatusServer] and optimistic keyboard interrupts. Everything here
+ * runs on the EDT, except reading [currentStatus]; the animation only runs while there is a status to show.
  */
 @Service(Service.Level.PROJECT)
 class HarnessStatusManager(private val project: Project) : Disposable {
@@ -35,56 +33,44 @@ class HarnessStatusManager(private val project: Project) : Disposable {
     @Volatile
     private var lastInterruptTime: Long = 0L
 
-    private var animator: Timer? = null
-    private var frame: Int = 0
-
-    /** Ensures the status server and status subsystem are ready. */
-    fun ensureStarted() {
-        project.service<HarnessStatusServer>().ensureStarted()
+    private var frame = 0
+    private val animator = Timer(FRAME_MS) {
+        frame++
+        showIcon()
     }
 
-    /** Called on EDT when a new status event arrives. */
     fun onStatusChanged(status: HarnessStatus) {
-        val previous = currentStatus
+        if (status == HarnessStatus.WAITING && currentStatus != HarnessStatus.WAITING) notifyWaitingIfHidden()
         currentStatus = status
+        // start() does nothing when already running, so thinking <-> tool doesn't restart the animation.
+        if (StatusIcons.isAnimated(status)) animator.start() else animator.stop()
+        showIcon()
+    }
 
-        if (status == HarnessStatus.WAITING && previous != HarnessStatus.WAITING) {
-            notifyWaitingIfHidden()
-        }
-
-        refreshIcon()
+    /** The user cut the turn short, which no hook reports. */
+    fun onInterrupt() {
+        lastInterruptTime = System.currentTimeMillis()
+        onStatusChanged(HarnessStatus.IDLE)
     }
 
     /**
-     * Listens for interrupt keys (Ctrl+C, Esc) in [component] to optimistically
-     * reset status to [HarnessStatus.IDLE] without waiting for hook completion.
+     * Listens for keys in [component] that change the status before any hook can report it:
+     * interrupts (Ctrl+C, Esc) and answers to a permission dialog.
      */
     fun watchInterruptKeys(component: Component, parent: Disposable) {
         val listener = AWTEventListener { event ->
-            val source = (event as? java.awt.event.ComponentEvent)?.component ?: event.source as? Component
-            if (isOurs(component, source)) {
-                if (event is KeyEvent && event.id == KeyEvent.KEY_PRESSED) {
-                    if (ClaudeInterruptKeys.isInterrupt(event.keyCode, event.modifiersEx)) {
-                        lastInterruptTime = System.currentTimeMillis()
-                        ApplicationManager.getApplication().invokeLater {
-                            if (!project.isDisposed) {
-                                onStatusChanged(HarnessStatus.IDLE)
-                            }
-                        }
-                    } else if (currentStatus == HarnessStatus.WAITING) {
-                        // WAITING only ever means an open dialog (see ClaudeStatusHooks.HOOKS), so a key
-                        // that answers it moves on at once: approve -> the tool runs, decline -> idle.
-                        // Navigation and other keys keep the WAITING indicator intact.
-                        val approved = ClaudeInterruptKeys.permissionAnswer(event.keyCode, event.keyChar)
-                        if (approved != null) {
-                            val nextStatus = if (approved) HarnessStatus.EXECUTING_TOOL else HarnessStatus.IDLE
-                            ApplicationManager.getApplication().invokeLater {
-                                if (!project.isDisposed && currentStatus == HarnessStatus.WAITING) {
-                                    onStatusChanged(nextStatus)
-                                }
-                            }
-                        }
-                    }
+            if (event !is KeyEvent || event.id != KeyEvent.KEY_PRESSED || !isOurs(component, event.component)) {
+                return@AWTEventListener
+            }
+            if (ClaudeInterruptKeys.isInterrupt(event.keyCode, event.modifiersEx)) {
+                onInterrupt()
+            } else if (currentStatus == HarnessStatus.WAITING) {
+                // WAITING only ever means an open dialog (see ClaudeStatusHooks.HOOKS), so a key
+                // that answers it moves on at once: approve -> the tool runs, decline -> idle.
+                when (ClaudeInterruptKeys.permissionAnswer(event.keyCode, event.keyChar)) {
+                    true -> onStatusChanged(HarnessStatus.EXECUTING_TOOL)
+                    false -> onStatusChanged(HarnessStatus.IDLE)
+                    null -> {}
                 }
             }
         }
@@ -92,45 +78,13 @@ class HarnessStatusManager(private val project: Project) : Disposable {
         Disposer.register(parent) { Toolkit.getDefaultToolkit().removeAWTEventListener(listener) }
     }
 
-    private fun isOurs(tabComponent: Component, source: Component?): Boolean {
-        if (source != null && SwingUtilities.isDescendingFrom(source, tabComponent)) return true
-        return ToolWindowManager.getInstance(project).activeToolWindowId == TOOL_WINDOW_ID
-    }
+    private fun isOurs(tabComponent: Component, source: Component): Boolean =
+        SwingUtilities.isDescendingFrom(source, tabComponent) ||
+            ToolWindowManager.getInstance(project).activeToolWindowId == TOOL_WINDOW_ID
 
-    private fun refreshIcon() {
-        if (project.isDisposed) return
-        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return
-
-        animator?.stop()
-        animator = null
-        frame = 0
-
-        val animated = ClaudeStatusIcons.isAnimatedHarness(currentStatus)
-        if (!animated) {
-            toolWindow.setIcon(ClaudeStatusIcons.forHarnessStatus(currentStatus, 0))
-            return
-        }
-
-        toolWindow.setIcon(ClaudeStatusIcons.forHarnessStatus(currentStatus, 0))
-        animator = Timer(FRAME_MS) {
-            if (project.isDisposed) {
-                animator?.stop()
-                return@Timer
-            }
-            frame++
-            val tw = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return@Timer
-            try {
-                tw.setIcon(ClaudeStatusIcons.forHarnessStatus(currentStatus, frame))
-            } catch (e: Exception) {
-                animator?.stop()
-                animator = null
-                LOG.warn("Status animation stopped after a paint failure", e)
-                tw.setIcon(ClaudeStatusIcons.BASE)
-            }
-        }.apply {
-            isRepeats = true
-            start()
-        }
+    private fun showIcon() {
+        ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID)
+            ?.setIcon(StatusIcons.forStatus(currentStatus, frame))
     }
 
     private fun notifyWaitingIfHidden() {
@@ -150,21 +104,17 @@ class HarnessStatusManager(private val project: Project) : Disposable {
         return buildString {
             appendLine("Server running: ${server.isRunning} (port ${server.port})")
             appendLine("Current status: ${currentStatus.id}")
-            appendLine("Animating: ${animator != null}")
+            appendLine("Animating: ${animator.isRunning}")
             appendLine("Interrupt key last seen: $keySeen")
         }
     }
 
     override fun dispose() {
-        animator?.stop()
-        animator = null
+        animator.stop()
     }
 
     companion object {
-        private val LOG = logger<HarnessStatusManager>()
         const val NOTIFICATION_GROUP = "Harness Aside"
         private const val FRAME_MS = 140
-
-        fun getInstance(project: Project): HarnessStatusManager = project.service()
     }
 }

@@ -1,6 +1,7 @@
 package com.github.baenar.harnessaside.antigravity
 
 import com.github.baenar.harnessaside.claude.ClaudeSessions
+import com.github.baenar.harnessaside.core.postStatusCommand
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -24,36 +25,18 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
 
     private val hooksPath: Path get() = configDir.resolve("hooks.json")
 
-    /** True when our status hooks are already present in hooks.json. */
-    fun isInstalled(): Boolean {
-        if (!Files.exists(hooksPath)) return false
-        return try {
-            val content = Files.readString(hooksPath)
-            content.contains("HARNESS_ASIDE_IDE_PORT") || content.contains(HOOK_NAME)
-        } catch (e: Exception) {
-            LOG.warn("Could not read $hooksPath", e)
-            false
-        }
-    }
-
     /**
-     * Merges the HTTP hooks into `hooks.json`, creating the directory/file if needed.
+     * Merges the HTTP hooks into `hooks.json`, creating the directory/file if needed. A file that doesn't parse
+     * is left alone rather than replaced, and an unchanged one isn't rewritten.
      *
      * @return true on success.
      */
     fun install(): Boolean = try {
         Files.createDirectories(configDir)
-        val root = if (Files.exists(hooksPath)) {
-            try {
-                JsonParser.parseString(Files.readString(hooksPath)).asJsonObject
-            } catch (_: Exception) {
-                JsonObject()
-            }
-        } else {
-            JsonObject()
-        }
+        val current = if (Files.exists(hooksPath)) Files.readString(hooksPath) else "{}"
+        val merged = GSON.toJson(merge(JsonParser.parseString(current).asJsonObject, windows))
         if (windows) Files.writeString(configDir.resolve(ALLOW_FILE), ALLOW_JSON)
-        Files.writeString(hooksPath, GSON.toJson(merge(root, windows)))
+        if (merged != current) Files.writeString(hooksPath, merged)
         true
     } catch (e: Exception) {
         LOG.warn("Could not install status hooks into $hooksPath", e)
@@ -84,14 +67,14 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
         fun isWindowsTarget(osName: String, userHome: String): Boolean =
             osName.startsWith("Windows", ignoreCase = true) && !ClaudeSessions.isWsl(userHome)
 
-        fun curlCommand(state: String, stdoutJson: String = "{}"): String =
-            "[ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=$state&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true; echo '$stdoutJson'"
+        /** Agy reads a hook's stdout as JSON, so every POSIX command ends by printing some. */
+        fun curlCommand(state: String): String = "${postStatusCommand(state)}; echo '{}'"
 
         fun preToolUseCommand(): String =
-            "PAYLOAD=\$(cat); if echo \"\$PAYLOAD\" | grep -qE '\"(${AntigravityHookEvents.WAITING_TOOLS.joinToString("|")})\"'; then STATE=\"waiting\"; else STATE=\"tool\"; fi; [ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=\$STATE&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true; echo '{\"decision\":\"allow\"}'"
+            "PAYLOAD=\$(cat); if echo \"\$PAYLOAD\" | grep -qE '\"(${AntigravityHookEvents.WAITING_TOOLS.joinToString("|")})\"'; then STATE=\"waiting\"; else STATE=\"tool\"; fi; ${postStatusCommand("\$STATE")}; echo '{\"decision\":\"allow\"}'"
 
         fun postToolUseCommand(): String =
-            "PAYLOAD=\$(cat); echo \"\$PAYLOAD\" | grep -qE '\"error\":[[:space:]]*\"[^\"]+' && STATE=\"idle\" || STATE=\"thinking\"; [ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=\$STATE&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true; echo '{}'"
+            "PAYLOAD=\$(cat); echo \"\$PAYLOAD\" | grep -qE '\"error\":[[:space:]]*\"[^\"]+' && STATE=\"idle\" || STATE=\"thinking\"; ${curlCommand("\$STATE")}"
 
         // Windows hooks run in cmd.exe, where a non-zero exit blocks the tool call, so every command ends in exit 0.
         // No double quotes anywhere: they reach cmd backslash-escaped. `%VAR%` stays literal when the variable is
@@ -113,69 +96,32 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
          * Adds or replaces the `harness-aside` hook group in [root], with commands for `cmd.exe` when [windows].
          */
         fun merge(root: JsonObject, windows: Boolean = false): JsonObject {
-            fun state(state: String) = if (windows) windowsStateCommand(state) else curlCommand(state, "{}")
-            val preTool = if (windows) windowsToolCommand("PreToolUse") else preToolUseCommand()
-            val postTool = if (windows) windowsToolCommand("PostToolUse") else postToolUseCommand()
-            val group = JsonObject()
-
-            // SessionStart -> idle
-            val sessionStart = JsonArray().apply {
-                add(createCommandHook(state("idle")))
-            }
-            group.add("SessionStart", sessionStart)
-
-            // PreInvocation -> thinking
-            val preInvocation = JsonArray().apply {
-                add(createCommandHook(state("thinking")))
-            }
-            group.add("PreInvocation", preInvocation)
-
-            // PreToolUse -> waiting for interactive tools (run_command, ask_question, file write/edit), else tool
-            val preToolUse = JsonArray().apply {
-                val toolObj = JsonObject().apply {
-                    addProperty("matcher", "*")
-                    val hooks = JsonArray().apply {
-                        add(createCommandHook(preTool))
-                    }
-                    add("hooks", hooks)
-                }
-                add(toolObj)
-            }
-            group.add("PreToolUse", preToolUse)
-
-            // PostToolUse -> idle if error / rejected by user, else thinking
-            val postToolUse = JsonArray().apply {
-                val toolObj = JsonObject().apply {
-                    addProperty("matcher", "*")
-                    val hooks = JsonArray().apply {
-                        add(createCommandHook(postTool))
-                    }
-                    add("hooks", hooks)
-                }
-                add(toolObj)
-            }
-            group.add("PostToolUse", postToolUse)
-
-            // PostInvocation -> idle
-            val postInvocation = JsonArray().apply {
-                add(createCommandHook(state("idle")))
-            }
-            group.add("PostInvocation", postInvocation)
-
-            // Stop -> idle
-            val stop = JsonArray().apply {
-                add(createCommandHook(state("idle")))
-            }
-            group.add("Stop", stop)
-
-            root.add(HOOK_NAME, group)
+            fun state(state: String) = if (windows) windowsStateCommand(state) else curlCommand(state)
+            root.add(HOOK_NAME, JsonObject().apply {
+                add("SessionStart", hook(state("idle")))
+                add("PreInvocation", hook(state("thinking")))
+                // waiting for interactive tools (run_command, ask_question, file write/edit), else tool
+                add("PreToolUse", toolHook(if (windows) windowsToolCommand("PreToolUse") else preToolUseCommand()))
+                // idle if error / rejected by user, else thinking
+                add("PostToolUse", toolHook(if (windows) windowsToolCommand("PostToolUse") else postToolUseCommand()))
+                add("PostInvocation", hook(state("idle")))
+                add("Stop", hook(state("idle")))
+            })
             return root
         }
 
-        private fun createCommandHook(command: String): JsonObject =
-            JsonObject().apply {
+        private fun hook(command: String): JsonArray = JsonArray().apply {
+            add(JsonObject().apply {
                 addProperty("type", "command")
                 addProperty("command", command)
-            }
+            })
+        }
+
+        private fun toolHook(command: String): JsonArray = JsonArray().apply {
+            add(JsonObject().apply {
+                addProperty("matcher", "*")
+                add("hooks", hook(command))
+            })
+        }
     }
 }

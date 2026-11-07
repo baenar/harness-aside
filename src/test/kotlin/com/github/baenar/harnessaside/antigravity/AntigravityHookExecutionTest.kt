@@ -53,7 +53,7 @@ class AntigravityHookExecutionTest {
     @Before
     fun setUp() {
         server.statusListener = { received.add(it) }
-        server.start()
+        server.ensureStarted()
         configDir = tmp.newFolder("config").toPath()
         val windows = AntigravityStatusHooks.isWindowsTarget(System.getProperty("os.name"), System.getProperty("user.home"))
         assertTrue(AntigravityStatusHooks(configDir, windows).install())
@@ -84,7 +84,7 @@ class AntigravityHookExecutionTest {
 
     @Test
     fun `hooks stay harmless when the IDE is gone`() {
-        val stopped = HarnessStatusServer().apply { start() }
+        val stopped = HarnessStatusServer().apply { ensureStarted() }
         val deadPort = stopped.port.toString()
         stopped.dispose()
         assertHarmless("server stopped", ideEnv() + mapOf("HARNESS_ASIDE_IDE_PORT" to deadPort))

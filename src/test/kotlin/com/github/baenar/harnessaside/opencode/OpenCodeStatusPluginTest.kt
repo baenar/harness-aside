@@ -29,7 +29,7 @@ class OpenCodeStatusPluginTest {
     @Before
     fun setUp() {
         server.statusListener = { received.add(it) }
-        server.start()
+        server.ensureStarted()
     }
 
     @After
@@ -81,7 +81,7 @@ class OpenCodeStatusPluginTest {
         val driver = Files.writeString(dir.resolve("driver.mjs"), """
             import { HarnessAsideStatus } from "./plugin.mjs"
             const port = process.env.HARNESS_ASIDE_IDE_PORT
-            if (port) await fetch(`http://127.0.0.1:${'$'}{port}/health`).then((r) => r.text()).catch((e) => console.log(`warm-up failed: ${'$'}{e}`))
+            if (port) await fetch(`http://127.0.0.1:${'$'}{port}/status`).then((r) => r.text()).catch((e) => console.log(`warm-up failed: ${'$'}{e}`))
             const send = globalThis.fetch
             globalThis.fetch = async (url, init) => {
               const start = performance.now()
