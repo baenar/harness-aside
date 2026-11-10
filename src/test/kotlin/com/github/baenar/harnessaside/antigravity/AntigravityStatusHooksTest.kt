@@ -4,7 +4,6 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -17,23 +16,11 @@ class AntigravityStatusHooksTest {
     val tmp = TemporaryFolder()
 
     @Test
-    fun `isInstalled detects configured hooks`() {
-        val dir = tmp.newFolder(".agents").toPath()
-        val hooks = AntigravityStatusHooks(dir)
-
-        assertFalse(hooks.isInstalled())
-
-        Files.writeString(dir.resolve("hooks.json"), """{"harness-aside": {}}""")
-        assertTrue(hooks.isInstalled())
-    }
-
-    @Test
     fun `install creates hooks file and merges cleanly`() {
         val dir = tmp.root.toPath().resolve(".gemini").resolve("config")
         val hooks = AntigravityStatusHooks(dir)
 
         assertTrue(hooks.install())
-        assertTrue(hooks.isInstalled())
 
         val content = Files.readString(dir.resolve("hooks.json"))
         val json = JsonParser.parseString(content).asJsonObject
@@ -64,8 +51,18 @@ class AntigravityStatusHooksTest {
     }
 
     @Test
+    fun `a hooks file that doesn't parse is left alone`() {
+        val dir = tmp.newFolder("broken").toPath()
+        val file = dir.resolve("hooks.json")
+        Files.writeString(file, "{ the user's hooks, mid-edit")
+
+        assertFalse(AntigravityStatusHooks(dir).install())
+        assertEquals("{ the user's hooks, mid-edit", Files.readString(file))
+    }
+
+    @Test
     fun `curl commands contain port token and stdout json`() {
-        val thinkingCmd = AntigravityStatusHooks.curlCommand("thinking", "{}")
+        val thinkingCmd = AntigravityStatusHooks.curlCommand("thinking")
         assertTrue(thinkingCmd.contains("HARNESS_ASIDE_IDE_PORT"))
         assertTrue(thinkingCmd.contains("HARNESS_ASIDE_IDE_TOKEN"))
         assertTrue(thinkingCmd.contains("state=thinking"))

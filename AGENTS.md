@@ -15,11 +15,11 @@
 
 ### Harness Launcher & Tab Lifecycle
 * **Launcher Panel (`HarnessLauncherPanel`)**: An empty-state Swing UI displayed when no harness is active. Lists registered harnesses from `HarnessRegistry` with one-click launch buttons.
-* **Single-Tab Management (`HarnessToolWindowUi`)**: Enforces that the tool window contains either the launcher panel or exactly one active interactive terminal session. Switching harnesses safely terminates the current process and returns to the launcher.
-* **Session Actions**: Toolbar actions to switch harness, restart the current session, or remove the active tab.
+* **Single-Tab Management (`HarnessToolWindowUi`)**: Enforces that the tool window contains either the launcher panel or exactly one active interactive terminal session. Switching harnesses safely terminates the current process and returns to the launcher. The header shows plain text (`running <harness>`), not a tab.
+* **Session Actions**: One title-bar action (circular arrow) ends the session and returns to the launcher.
 
 ### Claude Code Harness Integration
-* **CLI Execution (`ClaudeHarness`, `ClaudeTerminalService`)**: Launches or resumes Claude Code CLI sessions (`claude` or `claude -c`) inside the embedded JetBrains terminal widget.
+* **CLI Execution (`ClaudeHarness`)**: Launches or resumes Claude Code CLI sessions (`claude` or `claude -c`, depending on whether the project has a session to continue) inside the embedded JetBrains terminal widget.
 * **Session Storage Discovery (`ClaudeSessions`)**: Automatically resolves Claude session paths and transcripts across Linux, native Windows, and WSL environments (translating Windows UNC paths such as `\\wsl$\` and `\\wsl.localhost\`).
 * **Interrupt Detection (`ClaudeInterruptKeys`)**: Detects interrupt signals (e.g., Ctrl+C) to reset the status icon back to idle.
 
@@ -30,16 +30,17 @@
 
 ### Push-Based Status Server (`HarnessStatusServer`)
 * **Localhost Loopback Server**: An embedded HTTP server built on the standard JDK `com.sun.net.httpserver.HttpServer`, bound to `127.0.0.1` on an ephemeral port.
-* **Environment Injection**: Injects `HARNESS_ASIDE_IDE_PORT` and an ephemeral `HARNESS_ASIDE_IDE_TOKEN` (with backwards-compatible `HARNESS_IDE_PORT` / `HARNESS_IDE_TOKEN` fallbacks) into the terminal shell environment at startup.
+* **Environment Injection**: Injects `HARNESS_ASIDE_IDE_PORT` and an ephemeral `HARNESS_ASIDE_IDE_TOKEN` into the terminal shell environment at startup.
 * **Automatic Hook Configuration (`ClaudeStatusHooks`)**: Merges lightweight HTTP webhook hooks into global `~/.claude/settings.json`, triggering on events (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `Notification`, etc.).
 * **Endpoint (`POST /status?state=...`)**: Receives state notifications and updates the IDE tool window header and stripe button on the Event Dispatch Thread (EDT).
 
-### Status Visuals & Animations (`ClaudeStatusIcons`)
-* **States Supported**: `IDLE`, `THINKING`, `EXECUTING_TOOL`, `WAITING`, and `ERROR`.
+### Status Visuals & Animations (`StatusIcons`)
+* **States Supported**: `IDLE`, `THINKING`, `EXECUTING_TOOL`, `WAITING`, and `DONE` (idle after a finished turn).
 * **Adaptive Theme SVGs**: Separate color palettes for Light (`#6C707E`) and Dark (`#CED0D6`) IDE themes that integrate with IntelliJ's `SvgAttributePatcher`.
 * **Animated Feedback**: Custom animated SVG pixel art frames for working and waiting states.
+* **Alerts (`AlertOptionAction`)**: Two checkable options in the tool window's options menu play a sound and show a notification. "Sound When Input Needed" fires on entering `WAITING`; when off, a notification appears only if the tool window is hidden. "Sound When Done" fires on `DONE`, unless the user interrupted the turn.
 
-### Editor Context Sharing (`SendSelectionToClaudeAction`)
+### Editor Context Sharing (`SendSelectionToHarnessAction`)
 * **Context Menus**: Appears in the Editor context menu and Project View popup menu.
 * **Payload Injection**: Inserts formatted file references and text selections into the active harness terminal.
 

@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.github.baenar.harnessaside.core.postStatusCommand
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import java.nio.file.Files
@@ -22,51 +23,21 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
 
     private val settingsPath: Path get() = claudeDir.resolve("settings.json")
 
-    /** True when our status hooks are already present in settings.json. */
-    fun isInstalled(): Boolean {
-        if (!Files.exists(settingsPath)) return false
-        return try {
-            val content = Files.readString(settingsPath)
-            content.contains("HARNESS_ASIDE_IDE_PORT") || content.contains("/status?state=")
-        } catch (e: Exception) {
-            LOG.warn("Could not read $settingsPath", e)
-            false
-        }
-    }
-
     /**
-     * Cleans up any legacy scripts and merges the HTTP hooks into `settings.json`,
-     * preserving unrelated settings and replacing entries from earlier plugin versions.
+     * Merges the HTTP hooks into `settings.json`, preserving unrelated settings and replacing entries from
+     * earlier plugin versions. An unchanged file isn't rewritten: Claude reloads it when it changes.
      *
      * @return true on success.
      */
     fun install(): Boolean = try {
         Files.createDirectories(claudeDir)
-        cleanupLegacyFiles()
-
-        val root = if (Files.exists(settingsPath)) {
-            JsonParser.parseString(Files.readString(settingsPath)).asJsonObject
-        } else {
-            JsonObject()
-        }
-        Files.writeString(settingsPath, GSON.toJson(merge(root)))
+        val current = if (Files.exists(settingsPath)) Files.readString(settingsPath) else "{}"
+        val merged = GSON.toJson(merge(JsonParser.parseString(current).asJsonObject))
+        if (merged != current) Files.writeString(settingsPath, merged)
         true
     } catch (e: Exception) {
         LOG.warn("Could not install status hooks into $settingsPath", e)
         false
-    }
-
-    /** Neutralizes legacy aside-status.sh to exit 0 stub so running Claude processes don't fail, and cleans up legacy files. */
-    private fun cleanupLegacyFiles() {
-        val script = claudeDir.resolve(SCRIPT_FILE)
-        if (Files.exists(script)) {
-            runCatching {
-                Files.writeString(script, SCRIPT)
-                script.toFile().setExecutable(true)
-            }
-        }
-        val status = claudeDir.resolve(STATUS_DIR)
-        if (Files.isRegularFile(status)) runCatching { Files.delete(status) }
     }
 
     companion object {
@@ -74,10 +45,9 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
         private val GSON = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
 
         const val CLAUDE_DIR = ".claude"
-        const val SCRIPT_FILE = "aside-status.sh"
-        const val STATUS_DIR = "aside-status"
 
-        private val MARKERS = listOf("HARNESS_ASIDE_IDE_PORT", "HARNESS_IDE_PORT", "/status?state=", SCRIPT_FILE, STATUS_DIR)
+        /** What identifies our entries, including those of earlier plugin versions. */
+        private val MARKERS = listOf("HARNESS_ASIDE_IDE_PORT", "HARNESS_IDE_PORT", "/status?state=", "aside-status")
 
         fun forProject(project: Project, userHome: String = System.getProperty("user.home")): ClaudeStatusHooks? {
             val projectPath = project.basePath ?: return null
@@ -85,16 +55,13 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
             return ClaudeStatusHooks(Paths.get(storage.userHome, CLAUDE_DIR))
         }
 
-        fun curlCommand(state: String): String =
-            "[ -n \"\$HARNESS_ASIDE_IDE_PORT\" ] && curl -s -m 2 --connect-timeout 1 -X POST \"http://127.0.0.1:\$HARNESS_ASIDE_IDE_PORT/status?state=$state&token=\$HARNESS_ASIDE_IDE_TOKEN\" >/dev/null 2>&1 || true"
-
         /**
          * `PostToolUseFailure`: a failed tool call (say, Bash exiting non-zero) doesn't end the turn, so
          * Claude is still thinking. Only an interrupt does, and an interrupted turn fires no `Stop`.
          */
         fun toolFailureCommand(): String =
             "case \"\$(cat)\" in *'\"is_interrupt\":true'*|*'\"is_interrupt\": true'*) S=idle ;; *) S=thinking ;; esac; " +
-                curlCommand("\$S")
+                postStatusCommand("\$S")
 
         /** One entry in `settings.json`: [event], an optional [matcher] narrowing it, and its [command]. */
         data class Hook(val event: String, val command: String, val matcher: String? = null)
@@ -103,23 +70,23 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
          * Everything we install. The icon must leave "working" only when the turn really ends, and must
          * not re-enter it afterwards: `Notification` also fires for things like the idle reminder.
          */
-        @JvmField
         val HOOKS = listOf(
-            Hook("SessionStart", curlCommand("idle")),
-            Hook("UserPromptSubmit", curlCommand("thinking")),
-            Hook("PreToolUse", curlCommand("tool")),
-            Hook("PostToolUse", curlCommand("thinking")),
+            Hook("SessionStart", postStatusCommand("idle")),
+            Hook("UserPromptSubmit", postStatusCommand("thinking")),
+            Hook("PreToolUse", postStatusCommand("tool")),
+            Hook("PostToolUse", postStatusCommand("thinking")),
             Hook("PostToolUseFailure", toolFailureCommand()),
             // Notification matchers compare `notification_type`. Only dialogs wait on the user; the
             // idle reminder (~1 min after a turn) means Claude is idle, which also heals a stuck icon.
-            Hook("Notification", curlCommand("waiting"), "permission_prompt|elicitation_dialog|elicitation_url_dialog"),
-            Hook("Notification", curlCommand("idle"), "idle_prompt"),
-            Hook("PermissionRequest", curlCommand("waiting")),
+            Hook("Notification", postStatusCommand("waiting"), "permission_prompt|elicitation_dialog|elicitation_url_dialog"),
+            Hook("Notification", postStatusCommand("idle"), "idle_prompt"),
+            Hook("PermissionRequest", postStatusCommand("waiting")),
             // Auto-mode denial: the model is told and carries on (it may even retry), the turn goes on.
-            Hook("PermissionDenied", curlCommand("thinking")),
-            Hook("Stop", curlCommand("idle")),
-            Hook("StopFailure", curlCommand("idle")),
-            Hook("SessionEnd", curlCommand("idle")),
+            Hook("PermissionDenied", postStatusCommand("thinking")),
+            // The turn's end; an interrupted or denied turn fires neither of these.
+            Hook("Stop", postStatusCommand("done")),
+            Hook("StopFailure", postStatusCommand("done")),
+            Hook("SessionEnd", postStatusCommand("idle")),
         )
 
         /**
@@ -158,9 +125,5 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
                 add("hooks", JsonArray().apply { add(commandObj) })
             })
         }
-
-        /** Written over a legacy `aside-status.sh` so Claude sessions still referencing it don't fail. */
-        @JvmField
-        val SCRIPT = "#!/bin/sh\n# Migrated to HTTP status events in harness-aside\nexit 0\n"
     }
 }

@@ -8,19 +8,18 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.UUID
-import java.util.concurrent.Executors
 
 /**
- * Embedded lightweight HTTP micro-server running on 127.0.0.1 loopback on an ephemeral port.
+ * Embedded HTTP server on the 127.0.0.1 loopback, on an ephemeral port. Receives status pushes from running
+ * harnesses (Claude Code and Antigravity hooks, the OpenCode plugin) with zero CPU overhead while idle.
  *
- * Receives status push events from running AI harnesses (Claude Code hooks, Antigravity hooks,
- * OpenCode plugin fetch requests) with zero CPU overhead while idle.
+ * Requests are handled on the server's own dispatcher thread: there is one client and handling one takes
+ * next to nothing, so a separate executor would just be a thread to leak.
  */
 @Service(Service.Level.PROJECT)
 class HarnessStatusServer(private val project: Project?) : Disposable {
@@ -39,99 +38,60 @@ class HarnessStatusServer(private val project: Project?) : Disposable {
     val isRunning: Boolean
         get() = server != null
 
+    /** Starts the server unless it is already running, and returns its port. */
     @Synchronized
     fun ensureStarted(): Int {
         if (server == null) {
-            start()
+            try {
+                server = HttpServer.create(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 0).apply {
+                    createContext("/status", ::handleStatus)
+                    start()
+                }
+                LOG.info("HarnessStatusServer started on port $port")
+            } catch (e: Exception) {
+                LOG.error("Failed to start HarnessStatusServer", e)
+            }
         }
         return port
     }
 
     @Synchronized
-    fun start() {
-        if (server != null) return
-        try {
-            val address = InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0)
-            val http = HttpServer.create(address, 0)
-            http.createContext("/status", StatusHandler())
-            http.createContext("/health", HealthHandler())
-            val executor = Executors.newSingleThreadExecutor { runnable ->
-                Thread(runnable, "harness-aside-http").apply { isDaemon = true }
-            }
-            http.executor = executor
-            http.start()
-            server = http
-            LOG.info("HarnessStatusServer started on port ${http.address.port}")
-        } catch (e: Exception) {
-            LOG.error("Failed to start HarnessStatusServer", e)
-        }
-    }
-
     override fun dispose() {
-        synchronized(this) {
-            try {
-                server?.stop(0)
-            } catch (e: Exception) {
-                LOG.warn("Error stopping HarnessStatusServer", e)
-            } finally {
-                server = null
-            }
-        }
+        server?.stop(0)
+        server = null
     }
 
-    private inner class StatusHandler : HttpHandler {
-        override fun handle(exchange: HttpExchange) {
-            try {
-                val query = parseQuery(exchange.requestURI.query)
-                val tokenParam = query["token"] ?: exchange.requestHeaders.getFirst("X-Harness-Token")
+    private fun handleStatus(exchange: HttpExchange) {
+        try {
+            val query = parseQuery(exchange.requestURI.query)
+            if ((query["token"] ?: exchange.requestHeaders.getFirst("X-Harness-Token")) != token) {
+                sendResponse(exchange, 401, "Unauthorized\n")
+                return
+            }
 
-                if (tokenParam != null && tokenParam.isNotEmpty() && tokenParam != token) {
-                    sendResponse(exchange, 401, "Unauthorized\n")
+            // `event=` carries a harness hook payload to classify (Windows hooks can't); `state=` is pre-classified.
+            val event = query["event"]
+            val state = if (event == null) query["state"] else {
+                val body = String(exchange.requestBody.readNBytes(MAX_EVENT_BODY), StandardCharsets.UTF_8)
+                AntigravityHookEvents.state(event, body) ?: run {
+                    sendResponse(exchange, 400, "Unknown event\n")
                     return
                 }
-
-                // `event=` carries a harness hook payload to classify (Windows hooks can't); `state=` is pre-classified.
-                val event = query["event"]
-                val stateParam = if (event == null) query["state"] else {
-                    val body = String(exchange.requestBody.readNBytes(MAX_EVENT_BODY), StandardCharsets.UTF_8)
-                    AntigravityHookEvents.state(event, body) ?: run {
-                        sendResponse(exchange, 400, "Unknown event\n")
-                        return
-                    }
-                }
-
-                val status = when (stateParam?.lowercase()?.trim()) {
-                    "thinking" -> HarnessStatus.THINKING
-                    "tool" -> HarnessStatus.EXECUTING_TOOL
-                    "waiting" -> HarnessStatus.WAITING
-                    "idle", "end", "stop" -> HarnessStatus.IDLE
-                    "error" -> HarnessStatus.ERROR
-                    else -> HarnessStatus.fromId(stateParam.orEmpty()) ?: HarnessStatus.IDLE
-                }
-
-                statusListener?.invoke(status)
-
-                val app = ApplicationManager.getApplication()
-                if (app != null && project != null) {
-                    app.invokeLater {
-                        if (!project.isDisposed) {
-                            project.service<HarnessStatusManager>().onStatusChanged(status)
-                        }
-                    }
-                }
-
-                sendResponse(exchange, 200, "OK\n")
-            } catch (e: Exception) {
-                LOG.warn("Error handling /status request", e)
-                sendResponse(exchange, 500, "Error: ${e.message}\n")
             }
-        }
-    }
 
-    private inner class HealthHandler : HttpHandler {
-        override fun handle(exchange: HttpExchange) {
-            exchange.responseHeaders.set("Content-Type", "application/json")
-            sendResponse(exchange, 200, "{\"status\":\"ok\"}\n")
+            val status = HarnessStatus.fromId(state) ?: HarnessStatus.IDLE
+            statusListener?.invoke(status)
+            if (project != null) {
+                ApplicationManager.getApplication().invokeLater(
+                    { project.service<HarnessStatusManager>().onStatusChanged(status) },
+                    project.disposed,
+                )
+            }
+
+            sendResponse(exchange, 200, "OK\n")
+        } catch (e: Exception) {
+            LOG.warn("Error handling /status request", e)
+            sendResponse(exchange, 500, "Error: ${e.message}\n")
         }
     }
 
@@ -141,24 +101,13 @@ class HarnessStatusServer(private val project: Project?) : Disposable {
         exchange.responseBody.use { it.write(bytes) }
     }
 
-    private fun parseQuery(query: String?): Map<String, String> {
-        if (query.isNullOrEmpty()) return emptyMap()
-        return query.split("&").mapNotNull { param ->
-            val parts = param.split("=", limit = 2)
-            if (parts.isNotEmpty()) {
-                val key = parts[0]
-                val value = if (parts.size > 1) parts[1] else ""
-                key to value
-            } else null
-        }.toMap()
-    }
+    private fun parseQuery(query: String?): Map<String, String> =
+        query.orEmpty().split("&").associate { it.substringBefore('=') to it.substringAfter('=', "") }
 
-    companion object {
+    private companion object {
         private val LOG = logger<HarnessStatusServer>()
 
         /** Cap on a hook payload; a truncated one fails to parse and falls back to the default state. */
         private const val MAX_EVENT_BODY = 1 shl 20
-
-        fun getInstance(project: Project): HarnessStatusServer = project.service()
     }
 }

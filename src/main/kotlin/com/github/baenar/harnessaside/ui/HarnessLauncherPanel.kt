@@ -1,8 +1,10 @@
 package com.github.baenar.harnessaside.ui
 
+import com.github.baenar.harnessaside.claude.ClaudeHarness
 import com.github.baenar.harnessaside.core.Harness
 import com.github.baenar.harnessaside.core.HarnessRegistry
-import com.intellij.icons.AllIcons
+import com.github.baenar.harnessaside.core.HarnessTerminalService
+import com.intellij.openapi.components.service
 import com.intellij.util.IconUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
@@ -14,7 +16,6 @@ import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
-import java.awt.Component
 import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.event.MouseAdapter
@@ -48,7 +49,7 @@ class HarnessLauncherPanel(
         val headerPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
-            alignmentX = Component.LEFT_ALIGNMENT
+            alignmentX = LEFT_ALIGNMENT
 
             val titleLabel = JBLabel("Harness Aside").apply {
                 font = JBFont.h3().asBold()
@@ -69,7 +70,7 @@ class HarnessLauncherPanel(
         val listPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
-            alignmentX = Component.LEFT_ALIGNMENT
+            alignmentX = LEFT_ALIGNMENT
         }
 
         for (harness in HarnessRegistry.registered) {
@@ -104,13 +105,13 @@ class HarnessLauncherPanel(
             border = defaultBorder
             background = UIUtil.getTextFieldBackground()
             maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(64))
-            alignmentX = Component.LEFT_ALIGNMENT
+            alignmentX = LEFT_ALIGNMENT
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
         }
 
-        // Icon (sized consistently to match the default harness icon)
-        val rawIcon = harness.icon ?: AllIcons.Nodes.Console
-        val targetSize = HarnessRegistry.default.icon?.iconWidth ?: JBUI.scale(20)
+        // Icon (sized consistently to match Claude's)
+        val rawIcon = harness.icon
+        val targetSize = ClaudeHarness.icon.iconWidth
         val icon = if (rawIcon.iconWidth > targetSize || rawIcon.iconHeight > targetSize) {
             IconUtil.resizeSquared(rawIcon, targetSize)
         } else {
@@ -120,14 +121,14 @@ class HarnessLauncherPanel(
         card.add(iconLabel, BorderLayout.WEST)
 
         // Details (Display Name & Executable)
-            val textPanel = JPanel().apply {
-                layout = BoxLayout(this, BoxLayout.Y_AXIS)
-                isOpaque = false
+        val textPanel = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            isOpaque = false
 
             val nameLabel = JBLabel(harness.displayName).apply {
                 font = JBFont.label().asBold()
             }
-            val cmdLabel = JBLabel(if (harness.executable.isEmpty()) "Plain shell" else "Runs `${harness.executable}`").apply {
+            val cmdLabel = JBLabel(harness.executable?.let { "Runs `$it`" } ?: "Plain shell").apply {
                 foreground = UIUtil.getContextHelpForeground()
                 font = JBFont.small()
             }
@@ -168,6 +169,6 @@ class HarnessLauncherPanel(
     }
 
     private fun launchHarness(harness: Harness) {
-        harness.openSession(project, toolWindow)
+        project.service<HarnessTerminalService>().launch(toolWindow, harness)
     }
 }

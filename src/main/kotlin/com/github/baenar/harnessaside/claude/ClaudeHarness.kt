@@ -1,39 +1,24 @@
 package com.github.baenar.harnessaside.claude
 
 import com.github.baenar.harnessaside.core.Harness
-import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.wm.ToolWindow
+import com.intellij.openapi.util.IconLoader
 import javax.swing.Icon
 
-/**
- * Harness adapter for Claude Code (`claude`).
- */
+/** Harness adapter for Claude Code (`claude`). */
 object ClaudeHarness : Harness {
-    override val id: String = "claude"
-    override val displayName: String = "Claude Code"
-    override val executable: String = "claude"
-    override val icon: Icon get() = ClaudeStatusIcons.CLAUDE
+    override val displayName = "Claude Code"
+    override val executable = "claude"
+    override val icon: Icon by lazy { IconLoader.getIcon("/icons/claude.svg", ClaudeHarness::class.java) }
 
-    override fun openSession(
-        project: Project,
-        toolWindow: ToolWindow,
-        continueSession: Boolean,
-        sessionId: String?,
-    ) {
-        project.service<ClaudeStatusService>().ensureStarted()
-        setupStatusHooks(project)
-        val terminalService = project.service<ClaudeTerminalService>()
-        if (continueSession) {
-            terminalService.openContinuedSession(toolWindow, sessionId)
-        } else {
-            terminalService.openNewSession(toolWindow)
-        }
+    /** Continues the project's latest session, or starts one when it has none. */
+    override fun launchCommand(project: Project): String {
+        val projectPath = project.basePath ?: return executable
+        val resumable = ClaudeSessions.hasSessions(System.getProperty("user.home"), projectPath)
+        return if (resumable) "$executable -c" else executable
     }
 
-    override fun setupStatusHooks(project: Project) {
-        val hooks = ClaudeStatusHooks.forProject(project) ?: return
-        hooks.install()
+    override fun installStatusHooks(project: Project) {
+        ClaudeStatusHooks.forProject(project)?.install()
     }
 }
-

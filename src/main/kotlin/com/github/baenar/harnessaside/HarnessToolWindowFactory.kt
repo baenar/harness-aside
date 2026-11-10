@@ -1,15 +1,16 @@
 package com.github.baenar.harnessaside
 
-import com.github.baenar.harnessaside.claude.DiagnoseStatusAction
-import com.github.baenar.harnessaside.claude.EnableStatusHooksAction
-import com.github.baenar.harnessaside.claude.RemoveClaudeTabAction
-import com.github.baenar.harnessaside.claude.RestartClaudeTabAction
+import com.github.baenar.harnessaside.core.HarnessStatusManager
+import com.github.baenar.harnessaside.ui.AlertOptionAction
+import com.github.baenar.harnessaside.ui.DiagnoseStatusAction
+import com.github.baenar.harnessaside.ui.EndSessionAction
 import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.impl.content.ToolWindowContentUi
 import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
 
@@ -25,20 +26,29 @@ import com.intellij.ui.content.ContentManagerListener
 class HarnessToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        toolWindow.setTitleActions(
-            listOf(
-                RestartClaudeTabAction(toolWindow),
-                RemoveClaudeTabAction(toolWindow),
+        // The header text includes the tool window's name (see HarnessToolWindowUi.show).
+        toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
+        toolWindow.setTitleActions(listOf(EndSessionAction(toolWindow)))
+        toolWindow.setAdditionalGearActions(
+            DefaultActionGroup(
+                AlertOptionAction(
+                    "Sound When Input Needed",
+                    "Play a sound and show a notification when the harness needs your input",
+                    HarnessStatusManager.Companion::soundOnInput,
+                ),
+                AlertOptionAction(
+                    "Sound When Done",
+                    "Play a sound and show a notification when the harness finishes working",
+                    HarnessStatusManager.Companion::soundWhenDone,
+                ),
+                DiagnoseStatusAction(project),
             )
         )
-        toolWindow.setAdditionalGearActions(
-            DefaultActionGroup(EnableStatusHooksAction(project), DiagnoseStatusAction(project))
-        )
 
-        // Automatically return to the launcher whenever the active session tab is closed
+        // Automatically return to the launcher whenever the active session ends
         toolWindow.contentManager.addContentManagerListener(object : ContentManagerListener {
             override fun contentRemoved(event: ContentManagerEvent) {
-                if (!HarnessToolWindowUi.isSwitching && toolWindow.contentManager.contentCount == 0 && !project.isDisposed) {
+                if (toolWindow.contentManager.contentCount == 0 && !project.isDisposed) {
                     HarnessToolWindowUi.showLauncher(project, toolWindow)
                 }
             }

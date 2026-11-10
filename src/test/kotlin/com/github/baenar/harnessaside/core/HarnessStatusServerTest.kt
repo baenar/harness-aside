@@ -22,7 +22,7 @@ class HarnessStatusServerTest {
     fun setUp() {
         server = HarnessStatusServer()
         server.statusListener = { receivedStatuses.add(it) }
-        server.start()
+        server.ensureStarted()
     }
 
     @After
@@ -34,18 +34,6 @@ class HarnessStatusServerTest {
     fun `server starts on ephemeral loopback port`() {
         assertTrue(server.isRunning)
         assertTrue(server.port > 0)
-    }
-
-    @Test
-    fun `health endpoint returns 200 OK json`() {
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create("http://127.0.0.1:${server.port}/health"))
-            .GET()
-            .build()
-
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        assertEquals(200, response.statusCode())
-        assertTrue(response.body().contains("\"status\":\"ok\""))
     }
 
     @Test
@@ -89,6 +77,18 @@ class HarnessStatusServerTest {
     fun `status endpoint rejects incorrect token`() {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("http://127.0.0.1:${server.port}/status?state=thinking&token=invalid-secret"))
+            .POST(HttpRequest.BodyPublishers.noBody())
+            .build()
+
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        assertEquals(401, response.statusCode())
+        assertTrue(receivedStatuses.isEmpty())
+    }
+
+    @Test
+    fun `status endpoint rejects a request without a token`() {
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("http://127.0.0.1:${server.port}/status?state=thinking"))
             .POST(HttpRequest.BodyPublishers.noBody())
             .build()
 

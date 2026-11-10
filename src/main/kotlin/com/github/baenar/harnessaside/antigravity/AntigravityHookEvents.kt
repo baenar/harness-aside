@@ -18,12 +18,18 @@ object AntigravityHookEvents {
     fun state(event: String, stdin: String): String? = when (event) {
         "PreToolUse" -> if (toolName(stdin) in WAITING_TOOLS) "waiting" else "tool"
         "PostToolUse" -> if (hasError(stdin)) "idle" else "thinking"
+        "Stop" -> if (isFullyIdle(stdin)) "done" else "idle"
         else -> null
     }
 
     private fun toolName(stdin: String): String? = runCatching {
         JsonParser.parseString(stdin).asJsonObject.getAsJsonObject("toolCall").get("name").asString
     }.getOrNull()
+
+    /** `Stop` ends one execution; only `fullyIdle` says nothing else is still running. */
+    private fun isFullyIdle(stdin: String): Boolean = runCatching {
+        JsonParser.parseString(stdin).asJsonObject.get("fullyIdle").asBoolean
+    }.getOrDefault(false)
 
     /** `error` is optional and empty on success; only a non-empty string counts. */
     private fun hasError(stdin: String): Boolean = runCatching {

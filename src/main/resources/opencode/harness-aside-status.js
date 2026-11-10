@@ -19,9 +19,10 @@ export const HarnessAsideStatus = async () => {
 
   // Subagents run in child sessions; the turn is over only when none of them is busy.
   const busy = new Set()
+  // `session.idle` repeats `session.status`, so only the first report for a busy session is a finished turn.
   const idle = (sessionID) => {
-    busy.delete(sessionID)
-    if (busy.size === 0) send("idle")
+    const wasBusy = busy.delete(sessionID)
+    if (busy.size === 0) send(wasBusy ? "done" : "idle")
   }
 
   return {

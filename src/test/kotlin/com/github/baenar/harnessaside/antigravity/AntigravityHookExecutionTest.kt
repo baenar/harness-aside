@@ -47,13 +47,14 @@ class AntigravityHookExecutionTest {
         Case("PostToolUse", postTool(""), HarnessStatus.THINKING),
         Case("PostToolUse", postTool("user rejected the tool call"), HarnessStatus.IDLE),
         Case("PostInvocation", payload(), HarnessStatus.IDLE),
-        Case("Stop", payload(""","executionNum":1,"terminationReason":"done","error":"","fullyIdle":true"""), HarnessStatus.IDLE),
+        Case("Stop", payload(""","executionNum":1,"terminationReason":"done","error":"","fullyIdle":true"""), HarnessStatus.DONE),
+        Case("Stop", payload(""","executionNum":1,"terminationReason":"done","error":"","fullyIdle":false"""), HarnessStatus.IDLE),
     )
 
     @Before
     fun setUp() {
         server.statusListener = { received.add(it) }
-        server.start()
+        server.ensureStarted()
         configDir = tmp.newFolder("config").toPath()
         val windows = AntigravityStatusHooks.isWindowsTarget(System.getProperty("os.name"), System.getProperty("user.home"))
         assertTrue(AntigravityStatusHooks(configDir, windows).install())
@@ -84,7 +85,7 @@ class AntigravityHookExecutionTest {
 
     @Test
     fun `hooks stay harmless when the IDE is gone`() {
-        val stopped = HarnessStatusServer().apply { start() }
+        val stopped = HarnessStatusServer().apply { ensureStarted() }
         val deadPort = stopped.port.toString()
         stopped.dispose()
         assertHarmless("server stopped", ideEnv() + mapOf("HARNESS_ASIDE_IDE_PORT" to deadPort))

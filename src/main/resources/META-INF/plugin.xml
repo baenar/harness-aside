@@ -19,7 +19,7 @@
 
     <actions>
         <action id="HarnessAside.SendSelection"
-                class="com.github.baenar.harnessaside.SendSelectionToClaudeAction"
+                class="com.github.baenar.harnessaside.SendSelectionToHarnessAction"
                 text="Send to Harness Aside"
                 description="Insert a reference to this file and selection into the active harness terminal">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>

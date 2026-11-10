@@ -1,33 +1,25 @@
 package com.github.baenar.harnessaside.core
 
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.wm.ToolWindow
 import javax.swing.Icon
 
 /**
- * Common contract for an AI coding harness CLI runnable inside the dedicated tool window.
+ * An AI coding harness CLI runnable inside the dedicated tool window.
+ *
+ * Both functions run off the EDT, right before the terminal opens, so they may touch files.
  */
 interface Harness {
-    /** Unique identifier for the harness, e.g. "claude", "antigravity", "opencode". */
-    val id: String
-
-    /** Human-readable display name, e.g. "Claude Code", "Antigravity CLI", "OpenCode". */
+    /** Human-readable name, e.g. "Claude Code". */
     val displayName: String
 
-    /** Default binary name on PATH. */
-    val executable: String
+    /** Binary on PATH, or null for a plain shell. */
+    val executable: String?
 
-    /** Default icon representing this harness. */
-    val icon: Icon?
+    val icon: Icon
 
-    /** Starts or resumes a session of this harness in [toolWindow]. */
-    fun openSession(
-        project: Project,
-        toolWindow: ToolWindow,
-        continueSession: Boolean = true,
-        sessionId: String? = null,
-    )
+    /** What gets typed into the new terminal; null leaves it at the prompt. */
+    fun launchCommand(project: Project): String? = executable
 
-    /** Offers or sets up status hooks / integrations for this harness, if applicable. */
-    fun setupStatusHooks(project: Project) {}
+    /** Installs whatever pushes this harness's status to the IDE. */
+    fun installStatusHooks(project: Project) {}
 }
