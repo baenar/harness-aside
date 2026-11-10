@@ -83,8 +83,9 @@ class ClaudeStatusHooks(private val claudeDir: Path) {
             Hook("PermissionRequest", postStatusCommand("waiting")),
             // Auto-mode denial: the model is told and carries on (it may even retry), the turn goes on.
             Hook("PermissionDenied", postStatusCommand("thinking")),
-            Hook("Stop", postStatusCommand("idle")),
-            Hook("StopFailure", postStatusCommand("idle")),
+            // The turn's end; an interrupted or denied turn fires neither of these.
+            Hook("Stop", postStatusCommand("done")),
+            Hook("StopFailure", postStatusCommand("done")),
             Hook("SessionEnd", postStatusCommand("idle")),
         )
 

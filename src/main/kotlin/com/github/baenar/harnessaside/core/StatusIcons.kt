@@ -17,10 +17,10 @@ object StatusIcons {
     private val WORK: List<Icon> by lazy { frames("work") }
     private val HELP: List<Icon> by lazy { frames("help") }
 
-    fun isAnimated(status: HarnessStatus): Boolean = status != HarnessStatus.IDLE
+    fun isAnimated(status: HarnessStatus): Boolean = status != HarnessStatus.IDLE && status != HarnessStatus.DONE
 
     fun forStatus(status: HarnessStatus, frame: Int): Icon = when (status) {
-        HarnessStatus.IDLE -> DEFAULT
+        HarnessStatus.IDLE, HarnessStatus.DONE -> DEFAULT
         HarnessStatus.THINKING, HarnessStatus.EXECUTING_TOOL -> WORK[frame.mod(FRAMES)]
         HarnessStatus.WAITING -> HELP[frame.mod(FRAMES)]
     }

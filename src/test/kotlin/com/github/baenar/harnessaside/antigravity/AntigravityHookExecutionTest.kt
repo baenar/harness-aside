@@ -47,7 +47,8 @@ class AntigravityHookExecutionTest {
         Case("PostToolUse", postTool(""), HarnessStatus.THINKING),
         Case("PostToolUse", postTool("user rejected the tool call"), HarnessStatus.IDLE),
         Case("PostInvocation", payload(), HarnessStatus.IDLE),
-        Case("Stop", payload(""","executionNum":1,"terminationReason":"done","error":"","fullyIdle":true"""), HarnessStatus.IDLE),
+        Case("Stop", payload(""","executionNum":1,"terminationReason":"done","error":"","fullyIdle":true"""), HarnessStatus.DONE),
+        Case("Stop", payload(""","executionNum":1,"terminationReason":"done","error":"","fullyIdle":false"""), HarnessStatus.IDLE),
     )
 
     @Before

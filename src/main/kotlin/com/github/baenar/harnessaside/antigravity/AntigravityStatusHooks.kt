@@ -76,6 +76,9 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
         fun postToolUseCommand(): String =
             "PAYLOAD=\$(cat); echo \"\$PAYLOAD\" | grep -qE '\"error\":[[:space:]]*\"[^\"]+' && STATE=\"idle\" || STATE=\"thinking\"; ${curlCommand("\$STATE")}"
 
+        fun stopCommand(): String =
+            "PAYLOAD=\$(cat); echo \"\$PAYLOAD\" | grep -qE '\"fullyIdle\":[[:space:]]*true' && STATE=\"done\" || STATE=\"idle\"; ${curlCommand("\$STATE")}"
+
         // Windows hooks run in cmd.exe, where a non-zero exit blocks the tool call, so every command ends in exit 0.
         // No double quotes anywhere: they reach cmd backslash-escaped. `%VAR%` stays literal when the variable is
         // unset, which makes curl fail on the URL and is swallowed like any other connection failure.
@@ -105,7 +108,7 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
                 // idle if error / rejected by user, else thinking
                 add("PostToolUse", toolHook(if (windows) windowsToolCommand("PostToolUse") else postToolUseCommand()))
                 add("PostInvocation", hook(state("idle")))
-                add("Stop", hook(state("idle")))
+                add("Stop", hook(if (windows) windowsToolCommand("Stop") else stopCommand()))
             })
             return root
         }

@@ -35,9 +35,10 @@
 * **Endpoint (`POST /status?state=...`)**: Receives state notifications and updates the IDE tool window header and stripe button on the Event Dispatch Thread (EDT).
 
 ### Status Visuals & Animations (`StatusIcons`)
-* **States Supported**: `IDLE`, `THINKING`, `EXECUTING_TOOL`, and `WAITING`.
+* **States Supported**: `IDLE`, `THINKING`, `EXECUTING_TOOL`, `WAITING`, and `DONE` (idle after a finished turn).
 * **Adaptive Theme SVGs**: Separate color palettes for Light (`#6C707E`) and Dark (`#CED0D6`) IDE themes that integrate with IntelliJ's `SvgAttributePatcher`.
 * **Animated Feedback**: Custom animated SVG pixel art frames for working and waiting states.
+* **Alerts (`AlertOptionAction`)**: Two checkable options in the tool window's options menu play a sound and show a notification. "Sound When Input Needed" fires on entering `WAITING`; when off, a notification appears only if the tool window is hidden. "Sound When Done" fires on `DONE`, unless the user interrupted the turn.
 
 ### Editor Context Sharing (`SendSelectionToHarnessAction`)
 * **Context Menus**: Appears in the Editor context menu and Project View popup menu.

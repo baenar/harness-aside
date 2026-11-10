@@ -45,13 +45,13 @@ class ClaudeStatusHooksTest {
         assertTrue(toolCmd.contains("state=tool"))
 
         val stopCmd = hookCommands(dir, "Stop").single()
-        assertTrue(stopCmd.contains("state=idle"))
+        assertTrue(stopCmd.contains("state=done"))
 
         val deniedCmd = hookCommands(dir, "PermissionDenied").single()
         assertTrue("an auto-mode denial doesn't end the turn", deniedCmd.contains("state=thinking"))
 
         val stopFailureCmd = hookCommands(dir, "StopFailure").single()
-        assertTrue(stopFailureCmd.contains("state=idle"))
+        assertTrue(stopFailureCmd.contains("state=done"))
     }
 
     @Test

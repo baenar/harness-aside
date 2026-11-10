@@ -11,9 +11,10 @@ import org.junit.Test
 class StatusIconsTest {
 
     @Test
-    fun `only idle stays still`() {
+    fun `only the working and waiting states animate`() {
+        val animated = setOf(HarnessStatus.THINKING, HarnessStatus.EXECUTING_TOOL, HarnessStatus.WAITING)
         for (status in HarnessStatus.entries) {
-            assertEquals(status.name, status != HarnessStatus.IDLE, StatusIcons.isAnimated(status))
+            assertEquals(status.name, status in animated, StatusIcons.isAnimated(status))
         }
     }
 

@@ -7,10 +7,12 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
+import kotlin.reflect.KMutableProperty0
 
 /** Title-bar action: ends the session, which kills its terminal (pty), and returns to the launcher. */
 class EndSessionAction(private val toolWindow: ToolWindow) :
@@ -24,6 +26,19 @@ class EndSessionAction(private val toolWindow: ToolWindow) :
 
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabled = HarnessToolWindowUi.hasActiveTerminal(toolWindow)
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+}
+
+/** Gear-menu option: whether something a harness does plays a sound and shows a notification. */
+class AlertOptionAction(text: String, description: String, private val option: KMutableProperty0<Boolean>) :
+    ToggleAction(text, description, null), DumbAware {
+
+    override fun isSelected(e: AnActionEvent): Boolean = option.get()
+
+    override fun setSelected(e: AnActionEvent, state: Boolean) {
+        option.set(state)
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT

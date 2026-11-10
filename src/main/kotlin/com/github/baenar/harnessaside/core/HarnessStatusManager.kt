@@ -1,6 +1,7 @@
 package com.github.baenar.harnessaside.core
 
 import com.github.baenar.harnessaside.claude.ClaudeInterruptKeys
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
@@ -33,14 +34,22 @@ class HarnessStatusManager(private val project: Project) : Disposable {
     @Volatile
     private var lastInterruptTime: Long = 0L
 
+    /** The user cut the turn short, so its end isn't news. Cleared when the harness shows it carried on. */
+    private var interrupted = false
+
     private var frame = 0
     private val animator = Timer(FRAME_MS) {
         frame++
         showIcon()
     }
 
+    /** Swappable because a headless test run has no sound to play. */
+    internal var playSound: () -> Unit = { Toolkit.getDefaultToolkit().beep() }
+
     fun onStatusChanged(status: HarnessStatus) {
-        if (status == HarnessStatus.WAITING && currentStatus != HarnessStatus.WAITING) notifyWaitingIfHidden()
+        if (status == HarnessStatus.WAITING && currentStatus != HarnessStatus.WAITING) onInputNeeded()
+        if (status == HarnessStatus.DONE && !interrupted) onTurnDone()
+        if (StatusIcons.isAnimated(status)) interrupted = false
         currentStatus = status
         // start() does nothing when already running, so thinking <-> tool doesn't restart the animation.
         if (StatusIcons.isAnimated(status)) animator.start() else animator.stop()
@@ -50,6 +59,7 @@ class HarnessStatusManager(private val project: Project) : Disposable {
     /** The user cut the turn short, which no hook reports. */
     fun onInterrupt() {
         lastInterruptTime = System.currentTimeMillis()
+        interrupted = true
         onStatusChanged(HarnessStatus.IDLE)
     }
 
@@ -69,7 +79,7 @@ class HarnessStatusManager(private val project: Project) : Disposable {
                 // that answers it moves on at once: approve -> the tool runs, decline -> idle.
                 when (ClaudeInterruptKeys.permissionAnswer(event.keyCode, event.keyChar)) {
                     true -> onStatusChanged(HarnessStatus.EXECUTING_TOOL)
-                    false -> onStatusChanged(HarnessStatus.IDLE)
+                    false -> onInterrupt()
                     null -> {}
                 }
             }
@@ -87,13 +97,27 @@ class HarnessStatusManager(private val project: Project) : Disposable {
             ?.setIcon(StatusIcons.forStatus(currentStatus, frame))
     }
 
-    private fun notifyWaitingIfHidden() {
-        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID)
-        if (toolWindow != null && toolWindow.isVisible) return
+    /** With [soundOnInput]: a sound and a notification, always. Without it: a notification only if the tool window is hidden. */
+    private fun onInputNeeded() {
+        val alert = soundOnInput
+        if (alert) playSound()
 
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID)
+        if (!alert && toolWindow != null && toolWindow.isVisible) return
+
+        notify("Agent is waiting for your input")
+    }
+
+    private fun onTurnDone() {
+        if (!soundWhenDone) return
+        playSound()
+        notify("Agent has finished working")
+    }
+
+    private fun notify(message: String) {
         NotificationGroupManager.getInstance()
             .getNotificationGroup(NOTIFICATION_GROUP)
-            .createNotification("Agent is waiting for your input", NotificationType.INFORMATION)
+            .createNotification(message, NotificationType.INFORMATION)
             .notify(project)
     }
 
@@ -116,5 +140,16 @@ class HarnessStatusManager(private val project: Project) : Disposable {
     companion object {
         const val NOTIFICATION_GROUP = "Harness Aside"
         private const val FRAME_MS = 140
+        private const val SOUND_ON_INPUT_KEY = "harness.aside.soundOnInput"
+        private const val SOUND_WHEN_DONE_KEY = "harness.aside.soundWhenDone"
+
+        // The gear-menu options; they apply to every project and survive restarts.
+        var soundOnInput: Boolean
+            get() = PropertiesComponent.getInstance().getBoolean(SOUND_ON_INPUT_KEY)
+            set(value) = PropertiesComponent.getInstance().setValue(SOUND_ON_INPUT_KEY, value)
+
+        var soundWhenDone: Boolean
+            get() = PropertiesComponent.getInstance().getBoolean(SOUND_WHEN_DONE_KEY)
+            set(value) = PropertiesComponent.getInstance().setValue(SOUND_WHEN_DONE_KEY, value)
     }
 }

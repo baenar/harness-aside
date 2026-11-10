@@ -42,7 +42,7 @@ class ClaudeHookExecutionTest {
     }
 
     @Test
-    fun `a whole turn ends idle`() {
+    fun `a whole turn ends done`() {
         val turn = listOf(
             "UserPromptSubmit" to """{"prompt":"hi"}""",
             "PreToolUse" to """{"tool_name":"Bash"}""",
@@ -56,7 +56,7 @@ class ClaudeHookExecutionTest {
             listOf(
                 HarnessStatus.THINKING, HarnessStatus.EXECUTING_TOOL, HarnessStatus.WAITING,
                 HarnessStatus.THINKING, // a failed tool doesn't end the turn
-                HarnessStatus.THINKING, HarnessStatus.IDLE,
+                HarnessStatus.THINKING, HarnessStatus.DONE,
             ),
             states,
         )

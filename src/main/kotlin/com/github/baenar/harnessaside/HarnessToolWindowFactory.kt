@@ -1,5 +1,7 @@
 package com.github.baenar.harnessaside
 
+import com.github.baenar.harnessaside.core.HarnessStatusManager
+import com.github.baenar.harnessaside.ui.AlertOptionAction
 import com.github.baenar.harnessaside.ui.DiagnoseStatusAction
 import com.github.baenar.harnessaside.ui.EndSessionAction
 import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
@@ -27,7 +29,21 @@ class HarnessToolWindowFactory : ToolWindowFactory, DumbAware {
         // The header text includes the tool window's name (see HarnessToolWindowUi.show).
         toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
         toolWindow.setTitleActions(listOf(EndSessionAction(toolWindow)))
-        toolWindow.setAdditionalGearActions(DefaultActionGroup(DiagnoseStatusAction(project)))
+        toolWindow.setAdditionalGearActions(
+            DefaultActionGroup(
+                AlertOptionAction(
+                    "Sound When Input Needed",
+                    "Play a sound and show a notification when the harness needs your input",
+                    HarnessStatusManager.Companion::soundOnInput,
+                ),
+                AlertOptionAction(
+                    "Sound When Done",
+                    "Play a sound and show a notification when the harness finishes working",
+                    HarnessStatusManager.Companion::soundWhenDone,
+                ),
+                DiagnoseStatusAction(project),
+            )
+        )
 
         // Automatically return to the launcher whenever the active session ends
         toolWindow.contentManager.addContentManagerListener(object : ContentManagerListener {

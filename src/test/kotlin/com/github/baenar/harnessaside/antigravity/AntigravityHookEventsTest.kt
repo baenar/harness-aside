@@ -44,6 +44,6 @@ class AntigravityHookEventsTest {
 
     @Test
     fun `unknown event is rejected`() {
-        assertNull(AntigravityHookEvents.state("Stop", "{}"))
+        assertNull(AntigravityHookEvents.state("PostInvocation", "{}"))
     }
 }

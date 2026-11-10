@@ -54,10 +54,20 @@ class OpenCodeStatusPluginTest {
             listOf(
                 HarnessStatus.THINKING, HarnessStatus.EXECUTING_TOOL, HarnessStatus.WAITING, HarnessStatus.THINKING,
                 HarnessStatus.THINKING, HarnessStatus.THINKING, // the subagent finishing is not the turn finishing
-                HarnessStatus.IDLE,
+                HarnessStatus.DONE,
             ),
             received,
         )
+    }
+
+    @Test
+    fun `the repeated idle event doesn't report the turn as done twice`() {
+        val output = run(
+            """{"type":"session.status","properties":{"sessionID":"main","status":{"type":"busy"}}}""",
+            """{"type":"session.status","properties":{"sessionID":"main","status":{"type":"idle"}}}""",
+            """{"type":"session.idle","properties":{"sessionID":"main"}}""",
+        )
+        assertEquals(output, listOf(HarnessStatus.THINKING, HarnessStatus.DONE, HarnessStatus.IDLE), received)
     }
 
     @Test

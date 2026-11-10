@@ -12,7 +12,10 @@ enum class HarnessStatus(val id: String) {
     WAITING("waiting"),
 
     /** Running a tool or shell command. */
-    EXECUTING_TOOL("tool");
+    EXECUTING_TOOL("tool"),
+
+    /** Idle because the harness just finished a turn, which is what the "done" alert listens for. */
+    DONE("done");
 
     companion object {
         fun fromId(id: String?): HarnessStatus? = entries.firstOrNull { it.id == id }
