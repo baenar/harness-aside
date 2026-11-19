@@ -109,7 +109,7 @@ class HarnessStatusServerTest {
 
     @Test
     fun `event endpoint classifies a PreToolUse payload`() {
-        assertEquals(200, postEvent("PreToolUse", """{"toolCall":{"name":"run_command"}}""").statusCode())
+        assertEquals(200, postEvent("PreToolUse", """{"toolCall":{"name":"ask_question"}}""").statusCode())
         assertEquals(200, postEvent("PreToolUse", """{"toolCall":{"name":"view_file"}}""").statusCode())
         assertEquals(listOf(HarnessStatus.WAITING, HarnessStatus.EXECUTING_TOOL), receivedStatuses)
     }

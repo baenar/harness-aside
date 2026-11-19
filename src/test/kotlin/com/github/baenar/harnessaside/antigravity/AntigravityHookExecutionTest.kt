@@ -43,7 +43,8 @@ class AntigravityHookExecutionTest {
     private val cases = listOf(
         Case("SessionStart", payload(), HarnessStatus.IDLE),
         Case("PreInvocation", payload(), HarnessStatus.THINKING),
-        Case("PreToolUse", preTool("run_command"), HarnessStatus.WAITING),
+        Case("PreToolUse", preTool("ask_question"), HarnessStatus.WAITING),
+        Case("PreToolUse", preTool("run_command"), HarnessStatus.EXECUTING_TOOL),
         Case("PreToolUse", preTool("view_file"), HarnessStatus.EXECUTING_TOOL),
         Case("PostToolUse", postTool(""), HarnessStatus.THINKING),
         Case("PostToolUse", postTool("user rejected the tool call"), HarnessStatus.IDLE),
