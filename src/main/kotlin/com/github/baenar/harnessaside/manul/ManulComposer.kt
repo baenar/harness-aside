@@ -22,27 +22,25 @@ object ManulComposer {
 
     /** `manul-default`, or one of the 8 `manul_work_NN` and 8 `manul_help_NN` animation frames. */
     fun render(name: String, pick: Pick, color: String): String {
-        if (name == "manul-default") {
-            val label = "Manul — domyślne logo"
-            return "${root("mn mn4", label, color)}\n<title>$label</title>\n<style>$DARK_RULE</style>\n${face(pick, color)}\n</svg>\n"
-        }
+        val root = "<svg fill=\"none\" stroke=\"$color\" stroke-width=\"2\">\n"
+        if (name == "manul-default") return "$root${face(pick, color)}\n</svg>\n"
         val i = name.takeLast(2).toInt()
         if (name.startsWith("manul_work_")) {
             val left = if (i % 2 == 0) "23" else "22.2"
             val right = if (i % 2 == 0) "22.2" else "23"
             val dots = DOT_CONFIGS[i]
-            return "${root("mn mn4 mn4-work", "Manul pracuje (klatka $i)", color)}\n" +
-                "${face(pick, color, move = EYE_OFFSETS[i], eyeGroup = "")}\n" +
+            return root +
+                "${face(pick, color, move = EYE_OFFSETS[i])}\n" +
                 "<path stroke=\"$color\" fill=\"none\" d=\"M6.4 ${left}q1.6-1.6 3.2 0\"/>\n" +
                 "<path stroke=\"$color\" fill=\"none\" d=\"M14.4 ${right}q1.6-1.6 3.2 0\"/>\n" +
                 "<g fill=\"$color\" stroke=\"none\">\n" +
                 listOf("9", "12", "15").zip(dots).joinToString("") { (cx, dot) ->
-                    "<circle cx=\"$cx\" cy=\"${js(dot.first)}\" r=\"1.1\" opacity=\"${js(dot.second)}\" fill=\"$color\"/>\n"
+                    "<circle cx=\"$cx\" cy=\"${num(dot.first)}\" r=\"1.1\" opacity=\"${num(dot.second)}\" fill=\"$color\"/>\n"
                 } +
                 "</g>\n</svg>\n"
         }
-        return "${root("mn mn4 mn4-help", "Manul potrzebuje pomocy (klatka $i)", color)}\n" +
-            "<g transform=\"translate(${js(SHAKE_DX[i])}, 0)\">\n${face(pick, color, wide = true)}\n</g>\n" +
+        return root +
+            "<g transform=\"translate(${num(SHAKE_DX[i])}, 0)\">\n${face(pick, color, wide = true)}\n</g>\n" +
             "${if (i < 6) bang(color) else ""}\n</svg>\n"
     }
 
@@ -127,7 +125,7 @@ object ManulComposer {
         "diamond" to Eye(listOf(Solid("M0 -1.7L1.7 0L0 1.7L-1.7 0Z"))),
         "side-eye" to Eye(listOf(Ring(0.0, 0.0, 1.6), Dot(0.5, 0.0, 0.9)), right = listOf(Ring(0.0, 0.0, 1.6), Dot(-0.5, 0.0, 0.9))),
         "mismatch" to Eye(listOf(Dot(0.0, 0.0, 1.9)), right = listOf(Dot(0.0, 0.0, 1.0))),
-        "glasses" to Eye(listOf(Ring(0.0, 0.0, 1.7)), mid = { dx, k -> Line("M${js(-dx + 1.7 * k)} 0L${js(dx - 1.7 * k)} 0", 1.2) }),
+        "glasses" to Eye(listOf(Ring(0.0, 0.0, 1.7)), mid = { dx, k -> Line("M${num(-dx + 1.7 * k)} 0L${num(dx - 1.7 * k)} 0", 1.2) }),
     )
 
     /** Left side in classic coordinates, shifted by the head's anchor and mirrored. */
@@ -193,26 +191,20 @@ object ManulComposer {
         listOf(ON, OFF, OFF), listOf(OFF, ON, OFF), listOf(OFF, OFF, ON), listOf(OFF, OFF, OFF),
     )
     private val SHAKE_DX = listOf(0.0, 0.7, 1.0, 0.7, 0.0, -0.7, -1.0, -0.7)
-    private const val DARK_RULE = "@media(prefers-color-scheme:dark){.mn{color:#CED0D6}}"
-
-    private fun root(cls: String, label: String, c: String) =
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" class=\"$cls\" color=\"$c\" viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" " +
-            "fill=\"none\" stroke=\"$c\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" role=\"img\" aria-label=\"$label\">"
 
     private fun bang(c: String) =
-        "<g class=\"bang\">\n<path stroke=\"$c\" fill=\"none\" d=\"M12 .9V2.4\"/>\n<circle cx=\"12\" cy=\"4.4\" r=\".9\" fill=\"$c\" stroke=\"none\"/>\n</g>"
+        "<path stroke=\"$c\" fill=\"none\" d=\"M12 .9V2.4\"/>\n<circle cx=\"12\" cy=\"4.4\" r=\".9\" fill=\"$c\" stroke=\"none\"/>"
 
     // ------------------------------------------------------------------ parts
 
-    private fun face(pick: Pick, c: String, wide: Boolean = false, move: Double = 0.0, eyeGroup: String? = null): String {
+    private fun face(pick: Pick, c: String, wide: Boolean = false, move: Double = 0.0): String {
         val head = HEADS.getValue(pick.head)
         val ear = EARS.getValue(pick.ears)
-        val eye = eyes(pick, head, c, wide, move, grouped = eyeGroup != null)
         return listOf(
             "<path stroke=\"$c\" fill=\"none\" d=\"${outline(head, ear)}\"/>",
             earDetail(head, ear, c),
             whiskers(pick, head, c),
-            if (eyeGroup != null) "<g ${eyeGroup}fill=\"$c\" stroke=\"none\">\n$eye\n</g>" else eye,
+            eyes(pick, head, c, wide, move),
             mouth(pick, head, c),
         ).filter { it.isNotEmpty() }.joinToString("\n")
     }
@@ -230,12 +222,12 @@ object ManulComposer {
         return if (d.isEmpty()) "" else "<path stroke=\"$c\" stroke-width=\"1.2\" fill=\"none\" d=\"$d\"/>"
     }
 
-    private fun eyes(pick: Pick, head: Head, c: String, wide: Boolean, move: Double, grouped: Boolean): String {
+    private fun eyes(pick: Pick, head: Head, c: String, wide: Boolean, move: Double): String {
         val v = EYES.getValue(pick.eyes)
         val form = (if (wide) v.wide else null) ?: v
         val k = if (wide && v.wide == null) 1.3 else 1.0
         val dx = head.eyesDx
-        fun side(shapes: List<Shape>, cx: Double, sx: Double) = shapes.map { draw(it, c, cx, head.eyesY, sx, k, grouped) }
+        fun side(shapes: List<Shape>, cx: Double, sx: Double) = shapes.map { draw(it, c, cx, head.eyesY, sx, k) }
         return (
             side(form.left, 12 - dx + move, 1.0) +
                 side(form.right ?: form.left, 12 + dx + move, -1.0) +
@@ -249,7 +241,7 @@ object ManulComposer {
         val dy = head.whisker.second - 14.4
         val out = mutableListOf<String>()
         if (v.d != null) {
-            out += "<path stroke=\"$c\" stroke-width=\"${js(v.sw ?: 1.5)}\" fill=\"none\" d=\"${shift(v.d, dx, dy)}${flip(shift(v.right ?: v.d, dx, dy))}\"/>"
+            out += "<path stroke=\"$c\" stroke-width=\"${num(v.sw ?: 1.5)}\" fill=\"none\" d=\"${shift(v.d, dx, dy)}${flip(shift(v.right ?: v.d, dx, dy))}\"/>"
         }
         for ((x, y) in v.dots) for (px in listOf(x + dx, 24 - x - dx)) out += draw(Dot(px, y + dy, 0.9), c)
         return out.joinToString("\n")
@@ -267,15 +259,15 @@ object ManulComposer {
         return out.joinToString("\n")
     }
 
-    private fun draw(s: Shape, c: String, cx: Double = 0.0, cy: Double = 0.0, sx: Double = 1.0, k: Double = 1.0, grouped: Boolean = false): String {
-        val fill = "fill=\"$c\"" + if (grouped) "" else " stroke=\"none\""
+    private fun draw(s: Shape, c: String, cx: Double = 0.0, cy: Double = 0.0, sx: Double = 1.0, k: Double = 1.0): String {
+        val fill = "fill=\"$c\" stroke=\"none\""
         fun x(n: Double) = num(cx + sx * k * n)
         fun y(n: Double) = num(cy + k * n)
         return when (s) {
             is Dot -> "<circle cx=\"${x(s.x)}\" cy=\"${y(s.y)}\" r=\"${num(k * s.r)}\" $fill/>"
             is Ell -> "<ellipse cx=\"${x(s.x)}\" cy=\"${y(s.y)}\" rx=\"${num(k * s.rx)}\" ry=\"${num(k * s.ry)}\" $fill/>"
-            is Ring -> "<circle cx=\"${x(s.x)}\" cy=\"${y(s.y)}\" r=\"${num(k * s.r)}\" stroke=\"$c\" stroke-width=\"${js(s.sw)}\" fill=\"none\"/>"
-            is Line -> "<path stroke=\"$c\" stroke-width=\"${js(s.sw)}\" fill=\"none\" d=\"${xf(s.d, sx * k, k, cx, cy)}\"/>"
+            is Ring -> "<circle cx=\"${x(s.x)}\" cy=\"${y(s.y)}\" r=\"${num(k * s.r)}\" stroke=\"$c\" stroke-width=\"${num(s.sw)}\" fill=\"none\"/>"
+            is Line -> "<path stroke=\"$c\" stroke-width=\"${num(s.sw)}\" fill=\"none\" d=\"${xf(s.d, sx * k, k, cx, cy)}\"/>"
             is Solid -> "<path $fill d=\"${xf(s.d, sx * k, k, cx, cy)}\"/>"
         }
     }
@@ -324,12 +316,8 @@ object ManulComposer {
     private fun flip(d: String) = xf(d, -1.0, 1.0, 24.0, 0.0)
     private fun print(segs: List<Seg>) = segs.joinToString("") { s -> s.c + s.a.joinToString(" ") { num(it) } }
 
-    /** JavaScript's `String(+n.toFixed(2))`: half away from zero on the exact binary value, no trailing zeros. */
-    private fun num(n: Double): String =
-        BigDecimal(n).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString().let { if (it == "-0") "0" else it }
-
-    /** A number as JavaScript prints it in a template literal, for the values left unrounded. */
-    private fun js(n: Double): String = if (n % 1.0 == 0.0) n.toLong().toString() else n.toString()
+    /** Two decimals, never in exponent notation, which [parse] can't read. */
+    private fun num(n: Double): String = BigDecimal(n).setScale(2, RoundingMode.HALF_UP).toPlainString()
 
     private class Mulberry32(private var seed: Int) {
         fun next(): Double {
