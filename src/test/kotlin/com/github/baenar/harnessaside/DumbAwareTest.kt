@@ -3,6 +3,7 @@ package com.github.baenar.harnessaside
 import com.github.baenar.harnessaside.ui.AlertOptionAction
 import com.github.baenar.harnessaside.ui.DiagnoseStatusAction
 import com.github.baenar.harnessaside.ui.EndSessionAction
+import com.github.baenar.harnessaside.ui.MultiSessionAction
 import com.intellij.openapi.project.DumbAware
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,6 +22,7 @@ class DumbAwareTest {
             EndSessionAction::class,
             DiagnoseStatusAction::class,
             AlertOptionAction::class,
+            MultiSessionAction::class,
         )
         for (cls in classes) {
             assertTrue("${cls.simpleName} must implement DumbAware", DumbAware::class.java.isAssignableFrom(cls.java))

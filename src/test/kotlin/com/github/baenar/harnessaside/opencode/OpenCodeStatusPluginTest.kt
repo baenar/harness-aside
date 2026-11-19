@@ -25,10 +25,11 @@ class OpenCodeStatusPluginTest {
 
     private val server = HarnessStatusServer()
     private val received = CopyOnWriteArrayList<HarnessStatus>()
+    private lateinit var token: String
 
     @Before
     fun setUp() {
-        server.statusListener = { received.add(it) }
+        token = server.register { received.add(it) }
         server.ensureStarted()
     }
 
@@ -108,7 +109,7 @@ class OpenCodeStatusPluginTest {
         builder.environment().remove("HARNESS_ASIDE_IDE_PORT")
         if (port != null) {
             builder.environment()["HARNESS_ASIDE_IDE_PORT"] = port.toString()
-            builder.environment()["HARNESS_ASIDE_IDE_TOKEN"] = server.token
+            builder.environment()["HARNESS_ASIDE_IDE_TOKEN"] = token
         }
         val process = builder.start()
         val output = CompletableFuture.supplyAsync { process.inputStream.readAllBytes().toString(Charsets.UTF_8) }

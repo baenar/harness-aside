@@ -5,6 +5,7 @@ import com.github.baenar.harnessaside.ui.AlertOptionAction
 import com.github.baenar.harnessaside.ui.DiagnoseStatusAction
 import com.github.baenar.harnessaside.ui.EndSessionAction
 import com.github.baenar.harnessaside.ui.HarnessToolWindowUi
+import com.github.baenar.harnessaside.ui.MultiSessionAction
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -41,20 +42,20 @@ class HarnessToolWindowFactory : ToolWindowFactory, DumbAware {
                     "Play a sound and show a notification when the harness finishes working",
                     HarnessStatusManager.Companion::soundWhenDone,
                 ),
+                MultiSessionAction(toolWindow),
                 DiagnoseStatusAction(project),
             )
         )
 
-        // Automatically return to the launcher whenever the active session ends
+        // Back to the launcher whenever the single session ends
         toolWindow.contentManager.addContentManagerListener(object : ContentManagerListener {
             override fun contentRemoved(event: ContentManagerEvent) {
                 if (toolWindow.contentManager.contentCount == 0 && !project.isDisposed) {
-                    HarnessToolWindowUi.showLauncher(project, toolWindow)
+                    HarnessToolWindowUi.showMode(project, toolWindow)
                 }
             }
         })
 
-        // On open, always present the launcher view with supported harnesses
-        HarnessToolWindowUi.showLauncher(project, toolWindow)
+        HarnessToolWindowUi.showMode(project, toolWindow)
     }
 }

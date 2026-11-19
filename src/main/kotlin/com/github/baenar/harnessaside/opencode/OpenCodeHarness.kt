@@ -7,6 +7,7 @@ import javax.swing.Icon
 
 /** Harness adapter for OpenCode (`opencode`). Status comes from [OpenCodeStatusPlugin]. */
 object OpenCodeHarness : Harness {
+    override val id = "opencode"
     override val displayName = "OpenCode"
     override val executable = "opencode"
     override val icon: Icon by lazy { IconLoader.getIcon("/icons/opencode.svg", OpenCodeHarness::class.java) }

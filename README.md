@@ -9,6 +9,7 @@
 </p>
 
 Personal IntelliJ/PyCharm plugin: AI harnesses (Claude Code, Antigravity CLI, OpenCode) in a dedicated terminal tool window, docked on the right.
+One session at a time, or several side by side in tabs (options menu → Multiple Sessions), each tab with its own generated manul showing its status.
 
 Verified on **Windows**, **WSL**, and **Linux**.
 

@@ -17,11 +17,12 @@ class HarnessStatusServerTest {
     private lateinit var server: HarnessStatusServer
     private val client = HttpClient.newHttpClient()
     private val receivedStatuses = CopyOnWriteArrayList<HarnessStatus>()
+    private lateinit var token: String
 
     @Before
     fun setUp() {
         server = HarnessStatusServer()
-        server.statusListener = { receivedStatuses.add(it) }
+        token = server.register { receivedStatuses.add(it) }
         server.ensureStarted()
     }
 
@@ -39,7 +40,7 @@ class HarnessStatusServerTest {
     @Test
     fun `status endpoint dispatches thinking state`() {
         val request = HttpRequest.newBuilder()
-            .uri(URI.create("http://127.0.0.1:${server.port}/status?state=thinking&token=${server.token}"))
+            .uri(URI.create("http://127.0.0.1:${server.port}/status?state=thinking&token=$token"))
             .POST(HttpRequest.BodyPublishers.noBody())
             .build()
 
@@ -51,7 +52,7 @@ class HarnessStatusServerTest {
     @Test
     fun `status endpoint dispatches tool execution state`() {
         val request = HttpRequest.newBuilder()
-            .uri(URI.create("http://127.0.0.1:${server.port}/status?state=tool&token=${server.token}"))
+            .uri(URI.create("http://127.0.0.1:${server.port}/status?state=tool&token=$token"))
             .POST(HttpRequest.BodyPublishers.noBody())
             .build()
 
@@ -64,7 +65,7 @@ class HarnessStatusServerTest {
     fun `status endpoint accepts token in X-Harness-Token header`() {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("http://127.0.0.1:${server.port}/status?state=waiting"))
-            .header("X-Harness-Token", server.token)
+            .header("X-Harness-Token", token)
             .POST(HttpRequest.BodyPublishers.noBody())
             .build()
 
@@ -100,7 +101,7 @@ class HarnessStatusServerTest {
     private fun postEvent(event: String, body: String): HttpResponse<String> {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("http://127.0.0.1:${server.port}/status?event=$event"))
-            .header("X-Harness-Token", server.token)
+            .header("X-Harness-Token", token)
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build()
         return client.send(request, HttpResponse.BodyHandlers.ofString())
@@ -125,6 +126,32 @@ class HarnessStatusServerTest {
         assertEquals(400, postEvent("Bogus", "{}").statusCode())
         assertTrue(receivedStatuses.isEmpty())
     }
+
+    @Test
+    fun `each terminal's events reach only its own listener`() {
+        val other = CopyOnWriteArrayList<HarnessStatus>()
+        val otherToken = server.register { other.add(it) }
+
+        post("state=waiting&token=$otherToken")
+        post("state=thinking&token=$token")
+
+        assertEquals(listOf(HarnessStatus.WAITING), other)
+        assertEquals(listOf(HarnessStatus.THINKING), receivedStatuses)
+    }
+
+    @Test
+    fun `a closed terminal's token is turned away`() {
+        server.unregister(token)
+
+        assertEquals(401, post("state=thinking&token=$token").statusCode())
+        assertTrue(receivedStatuses.isEmpty())
+    }
+
+    private fun post(query: String): HttpResponse<String> = client.send(
+        HttpRequest.newBuilder().uri(URI.create("http://127.0.0.1:${server.port}/status?$query"))
+            .POST(HttpRequest.BodyPublishers.noBody()).build(),
+        HttpResponse.BodyHandlers.ofString(),
+    )
 
     @Test
     fun `dispose stops the server`() {

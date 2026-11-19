@@ -2,35 +2,31 @@ package com.github.baenar.harnessaside.core
 
 import com.github.baenar.harnessaside.antigravity.AntigravityHookEvents
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.project.Project
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Embedded HTTP server on the 127.0.0.1 loopback, on an ephemeral port. Receives status pushes from running
  * harnesses (Claude Code and Antigravity hooks, the OpenCode plugin) with zero CPU overhead while idle.
  *
+ * Every terminal gets its own token, which its harness sends back with each event, so in multi-session mode
+ * an event reaches the session that sent it. A token nobody [register]ed is turned away.
+ *
  * Requests are handled on the server's own dispatcher thread: there is one client and handling one takes
  * next to nothing, so a separate executor would just be a thread to leak.
  */
 @Service(Service.Level.PROJECT)
-class HarnessStatusServer(private val project: Project?) : Disposable {
-
-    constructor() : this(null)
+class HarnessStatusServer : Disposable {
 
     private var server: HttpServer? = null
-    val token: String = UUID.randomUUID().toString()
-
-    @Volatile
-    var statusListener: ((HarnessStatus) -> Unit)? = null
+    private val listeners = ConcurrentHashMap<String, (HarnessStatus) -> Unit>()
 
     val port: Int
         get() = server?.address?.port ?: 0
@@ -55,6 +51,17 @@ class HarnessStatusServer(private val project: Project?) : Disposable {
         return port
     }
 
+    /** A token for one terminal; its events go to [listener], called on the server's thread. */
+    fun register(listener: (HarnessStatus) -> Unit): String {
+        val token = UUID.randomUUID().toString()
+        listeners[token] = listener
+        return token
+    }
+
+    fun unregister(token: String) {
+        listeners.remove(token)
+    }
+
     @Synchronized
     override fun dispose() {
         server?.stop(0)
@@ -64,7 +71,8 @@ class HarnessStatusServer(private val project: Project?) : Disposable {
     private fun handleStatus(exchange: HttpExchange) {
         try {
             val query = parseQuery(exchange.requestURI.query)
-            if ((query["token"] ?: exchange.requestHeaders.getFirst("X-Harness-Token")) != token) {
+            val token = query["token"] ?: exchange.requestHeaders.getFirst("X-Harness-Token")
+            val listener = token?.let(listeners::get) ?: run {
                 sendResponse(exchange, 401, "Unauthorized\n")
                 return
             }
@@ -79,15 +87,7 @@ class HarnessStatusServer(private val project: Project?) : Disposable {
                 }
             }
 
-            val status = HarnessStatus.fromId(state) ?: HarnessStatus.IDLE
-            statusListener?.invoke(status)
-            if (project != null) {
-                ApplicationManager.getApplication().invokeLater(
-                    { project.service<HarnessStatusManager>().onStatusChanged(status) },
-                    project.disposed,
-                )
-            }
-
+            listener(HarnessStatus.fromId(state) ?: HarnessStatus.IDLE)
             sendResponse(exchange, 200, "OK\n")
         } catch (e: Exception) {
             LOG.warn("Error handling /status request", e)

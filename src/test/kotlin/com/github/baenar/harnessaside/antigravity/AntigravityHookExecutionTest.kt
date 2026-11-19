@@ -35,6 +35,7 @@ class AntigravityHookExecutionTest {
 
     private val server = HarnessStatusServer()
     private val received = CopyOnWriteArrayList<HarnessStatus>()
+    private lateinit var token: String
     private lateinit var configDir: Path
 
     private data class Case(val event: String, val stdin: String, val expected: HarnessStatus)
@@ -53,7 +54,7 @@ class AntigravityHookExecutionTest {
 
     @Before
     fun setUp() {
-        server.statusListener = { received.add(it) }
+        token = server.register { received.add(it) }
         server.ensureStarted()
         configDir = tmp.newFolder("config").toPath()
         val windows = AntigravityStatusHooks.isWindowsTarget(System.getProperty("os.name"), System.getProperty("user.home"))
@@ -135,7 +136,7 @@ class AntigravityHookExecutionTest {
 
     private fun ideEnv(): Map<String, String?> = mapOf(
         "HARNESS_ASIDE_IDE_PORT" to server.port.toString(),
-        "HARNESS_ASIDE_IDE_TOKEN" to server.token,
+        "HARNESS_ASIDE_IDE_TOKEN" to token,
     )
 
     private fun violations(event: String, result: HookShell.Result): List<String> = buildList {

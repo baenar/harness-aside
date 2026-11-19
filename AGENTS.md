@@ -15,8 +15,9 @@
 
 ### Harness Launcher & Tab Lifecycle
 * **Launcher Panel (`HarnessLauncherPanel`)**: An empty-state Swing UI displayed when no harness is active. Lists registered harnesses from `HarnessRegistry` with one-click launch buttons.
-* **Single-Tab Management (`HarnessToolWindowUi`)**: Enforces that the tool window contains either the launcher panel or exactly one active interactive terminal session. Switching harnesses safely terminates the current process and returns to the launcher. The header shows plain text (`running <harness>`), not a tab.
-* **Session Actions**: One title-bar action (circular arrow) ends the session and returns to the launcher.
+* **Session Modes (`HarnessToolWindowUi`)**: The tool window always holds exactly one content. In single-session mode (the default) it is the launcher panel or one terminal; the circular-arrow title action ends the session and returns to the launcher. "Multiple Sessions" in the options menu switches the project to multi-session mode (asking first when that ends running sessions). The header shows plain text (`running <harness>`), not a tab.
+* **Multi-Session Tabs (`MultiSessionPanel`)**: A scrollable strip of tabs, one terminal each, with "+" for a new tab and "–" to close one. A new tab shows the launcher. Each tab has a seed (`HarnessTabsState`, in the per-user workspace file) that picks its manul; the manul shows that session's status, and the tool window button stays still. Tabs come back after an IDE restart and start their terminal when first selected; a Claude tab is pinned to its own session id (`--session-id`, then `-r`).
+* **Generated Manuls (`ManulComposer`, `ManulIcon`)**: `ManulComposer` composes a manul from a seed and renders it as SVG, which `ManulIcon` draws with Java2D.
 
 ### Claude Code Harness Integration
 * **CLI Execution (`ClaudeHarness`)**: Launches or resumes Claude Code CLI sessions (`claude` or `claude -c`, depending on whether the project has a session to continue) inside the embedded JetBrains terminal widget.
@@ -30,7 +31,7 @@
 
 ### Push-Based Status Server (`HarnessStatusServer`)
 * **Localhost Loopback Server**: An embedded HTTP server built on the standard JDK `com.sun.net.httpserver.HttpServer`, bound to `127.0.0.1` on an ephemeral port.
-* **Environment Injection**: Injects `HARNESS_ASIDE_IDE_PORT` and an ephemeral `HARNESS_ASIDE_IDE_TOKEN` into the terminal shell environment at startup.
+* **Environment Injection**: Injects `HARNESS_ASIDE_IDE_PORT` and an ephemeral `HARNESS_ASIDE_IDE_TOKEN` into the terminal shell environment at startup. Every terminal gets its own token, which routes its events to its own `SessionStatus`; unknown tokens are rejected.
 * **Automatic Hook Configuration (`ClaudeStatusHooks`)**: Merges lightweight HTTP webhook hooks into global `~/.claude/settings.json`, triggering on events (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `Notification`, etc.).
 * **Endpoint (`POST /status?state=...`)**: Receives state notifications and updates the IDE tool window header and stripe button on the Event Dispatch Thread (EDT).
 
@@ -59,9 +60,9 @@ All code modifications must strictly adhere to the following principles:
 * **No unnecessary dependencies**: Rely on the JetBrains Platform SDK and the standard JDK (`java.*`, `com.sun.net.httpserver.*`). Do not introduce heavyweight external networking, JSON, or reactive libraries.
 * **Thread safety and EDT rules**: Any code updating Swing components, tool window titles, or icons must execute strictly on the Event Dispatch Thread using `ApplicationManager.getApplication().invokeLater`. Network listening and I/O must remain on background threads.
 
-### 3. Strict Single-Tab Invariant
-* Never allow multiple concurrent terminal tabs to accumulate in the tool window.
-* The tool window must always hold exactly one content element: either the launcher panel or the active harness terminal.
+### 3. Strict Single-Content Invariant
+* The tool window must always hold exactly one content element: the launcher panel or the active harness terminal in single-session mode, the `MultiSessionPanel` in multi-session mode.
+* Never let platform content tabs accumulate; multi-session tabs live inside `MultiSessionPanel`, only when the user chose that mode.
 
 ### 4. Cross-Platform Path Handling
 * Never assume a standard POSIX or Windows-only filesystem.

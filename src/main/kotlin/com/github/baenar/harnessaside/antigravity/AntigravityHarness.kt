@@ -7,6 +7,7 @@ import javax.swing.Icon
 
 /** Harness adapter for Antigravity CLI (`agy`). */
 object AntigravityHarness : Harness {
+    override val id = "antigravity"
     override val displayName = "Antigravity CLI"
     override val executable = "agy"
     override val icon: Icon by lazy { IconLoader.getIcon("/icons/antigravity.svg", AntigravityHarness::class.java) }
