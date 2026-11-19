@@ -9,14 +9,23 @@ import java.awt.Color
 import java.awt.Component
 import java.awt.Graphics
 import java.awt.Graphics2D
+import java.awt.Paint
 import java.awt.RenderingHints
 import java.awt.Shape
 import java.awt.geom.Ellipse2D
 import java.awt.geom.Path2D
 import javax.swing.Icon
 
-/** One seed's manul, in every state a session can be in. EDT only. */
-class Manul(seed: Int) {
+/** What a manul is painted with: [paint] for every shape, over an optional [shadow] cast down and right. */
+class ManulInk(val paint: Paint, val shadow: Color? = null) {
+    companion object {
+        /** The theme's icon gray, like the tool window button's manul. */
+        val THEME = ManulInk(JBColor(Color(0x6C707E), Color(0xCED0D6)))
+    }
+}
+
+/** One seed's manul, in every state a session can be in, painted with whatever [ink] gives at the time. EDT only. */
+class Manul(seed: Int, private val ink: () -> ManulInk) {
     private val pick = ManulComposer.pick(seed)
     private val icons = HashMap<Pair<String, Int>, Icon>()
 
@@ -27,18 +36,17 @@ class Manul(seed: Int) {
             HarnessStatus.THINKING, HarnessStatus.EXECUTING_TOOL -> "manul_work_%02d".format(frame.mod(8))
             HarnessStatus.WAITING -> "manul_help_%02d".format(frame.mod(8))
         }
-        return icons.getOrPut(name to size) { ManulIcon(pick, name, size) }
+        return icons.getOrPut(name to size) { ManulIcon(pick, name, size, ink) }
     }
 }
 
 /**
- * A composed manul, drawn with Java2D from the composer's SVG: no image files, sharp at any scale, and in the
- * current theme's colours. It reads only what [ManulComposer] writes: `path` (M L H V Q C Z, absolute and
+ * A composed manul, drawn with Java2D from the composer's SVG: no image files, sharp at any scale, and in
+ * [ink]'s paint. It reads only what [ManulComposer] writes: `path` (M L H V Q C Z, absolute and
  * relative), `circle`, `ellipse`, and `g` with fill, stroke, stroke-width or a translate.
  */
-class ManulIcon(pick: ManulComposer.Pick, name: String, private val size: Int) : Icon {
-    private val light by lazy { drawing(ManulComposer.render(name, pick, ManulComposer.LIGHT)) }
-    private val dark by lazy { drawing(ManulComposer.render(name, pick, ManulComposer.DARK)) }
+class ManulIcon(pick: ManulComposer.Pick, name: String, private val size: Int, private val ink: () -> ManulInk) : Icon {
+    private val ops by lazy { drawing(ManulComposer.render(name, pick, "currentColor")) }
 
     override fun getIconWidth() = JBUI.scale(size)
     override fun getIconHeight() = JBUI.scale(size)
@@ -50,18 +58,24 @@ class ManulIcon(pick: ManulComposer.Pick, name: String, private val size: Int) :
             g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
             g2.translate(x, y)
             g2.scale(iconWidth / 24.0, iconHeight / 24.0)
-            for (op in if (JBColor.isBright()) light else dark) op.paint(g2)
+            val ink = ink()
+            ink.shadow?.let { shadow ->
+                g2.translate(SHADOW, SHADOW)
+                for (op in ops) op.paint(g2, shadow)
+                g2.translate(-SHADOW, -SHADOW)
+            }
+            for (op in ops) op.paint(g2, ink.paint)
         } finally {
             g2.dispose()
         }
     }
 
-    private class Op(val shape: Shape, val fill: Color?, val stroke: Color?, val width: Float, val opacity: Float) {
-        fun paint(g: Graphics2D) {
+    private class Op(val shape: Shape, val fill: Boolean, val stroke: Boolean, val width: Float, val opacity: Float) {
+        fun paint(g: Graphics2D, paint: Paint) {
             if (opacity < 1f) g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity)
-            fill?.let { g.color = it; g.fill(shape) }
-            stroke?.let {
-                g.color = it
+            g.paint = paint
+            if (fill) g.fill(shape)
+            if (stroke) {
                 g.stroke = BasicStroke(width, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
                 g.draw(shape)
             }
@@ -70,6 +84,8 @@ class ManulIcon(pick: ManulComposer.Pick, name: String, private val size: Int) :
     }
 
     private companion object {
+        /** In the icon's 24 units. */
+        private const val SHADOW = 0.6
         private val TAG = Regex("<(/?)([a-z]+)([^>]*?)(/?)>")
         private val ATTRIBUTE = Regex("([a-z-]+)=\"([^\"]*)\"")
         private val TRANSLATE = Regex("translate\\(([-\\d.]+), ([-\\d.]+)\\)")
@@ -98,8 +114,8 @@ class ManulIcon(pick: ManulComposer.Pick, name: String, private val size: Int) :
                     val a = context.attrs
                     ops += Op(
                         shape,
-                        a["fill"]?.let(::color),
-                        a["stroke"]?.let(::color),
+                        inked(a["fill"]),
+                        inked(a["stroke"]),
                         a["stroke-width"]?.toFloat() ?: 1f,
                         own["opacity"]?.toFloat() ?: 1f,
                     )
@@ -109,7 +125,7 @@ class ManulIcon(pick: ManulComposer.Pick, name: String, private val size: Int) :
             return ops
         }
 
-        private fun color(value: String): Color? = if (value == "none") null else Color.decode(value)
+        private fun inked(value: String?) = value != null && value != "none"
 
         private fun shape(tag: String, a: Map<String, String>, at: Context): Shape? {
             fun n(key: String) = a.getValue(key).toDouble()

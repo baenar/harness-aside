@@ -1,5 +1,6 @@
 package com.github.baenar.harnessaside.core
 
+import com.github.baenar.harnessaside.manul.ManulInk
 import com.intellij.openapi.project.Project
 import javax.swing.Icon
 
@@ -19,6 +20,9 @@ interface Harness {
     val executable: String?
 
     val icon: Icon
+
+    /** What its multi-session tab's manul is painted with. */
+    val manulInk: ManulInk get() = ManulInk.THEME
 
     /**
      * What gets typed into the new terminal; null leaves it at the prompt. [sessionId] is set for a

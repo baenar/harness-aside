@@ -1,8 +1,10 @@
 package com.github.baenar.harnessaside.claude
 
 import com.github.baenar.harnessaside.core.Harness
+import com.github.baenar.harnessaside.manul.ManulInk
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.IconLoader
+import java.awt.Color
 import javax.swing.Icon
 
 /** Harness adapter for Claude Code (`claude`). */
@@ -11,6 +13,7 @@ object ClaudeHarness : Harness {
     override val displayName = "Claude Code"
     override val executable = "claude"
     override val icon: Icon by lazy { IconLoader.getIcon("/icons/claude.svg", ClaudeHarness::class.java) }
+    override val manulInk = ManulInk(Color(0xD97757)) // the logo's orange
 
     override fun launchCommand(project: Project, sessionId: String?): String {
         val projectPath = project.basePath ?: return executable

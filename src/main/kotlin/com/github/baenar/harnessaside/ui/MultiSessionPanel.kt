@@ -5,6 +5,7 @@ import com.github.baenar.harnessaside.core.HarnessStatus
 import com.github.baenar.harnessaside.core.HarnessTerminalService
 import com.github.baenar.harnessaside.core.SessionStatus
 import com.github.baenar.harnessaside.manul.Manul
+import com.github.baenar.harnessaside.manul.ManulInk
 import com.intellij.icons.AllIcons
 import com.intellij.ide.SaveAndSyncHandler
 import com.intellij.openapi.Disposable
@@ -160,7 +161,7 @@ class MultiSessionPanel(private val project: Project, private val toolWindow: To
 
     private inner class Tab(val saved: HarnessTabsState.SavedTab) {
         val key = UUID.randomUUID().toString()
-        val manul = Manul(saved.seed)
+        val manul = Manul(saved.seed) { harness?.manulInk ?: ManulInk.THEME }
         val card = TabCard(this)
         var content: JComponent = JPanel()
         var widget: TerminalWidget? = null

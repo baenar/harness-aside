@@ -8,9 +8,6 @@ import java.math.RoundingMode
  */
 object ManulComposer {
 
-    const val LIGHT = "#6C707E"
-    const val DARK = "#CED0D6"
-
     data class Pick(val head: String, val ears: String, val eyes: String, val whiskers: String, val mouth: String)
 
     /** One random part per slot, from a seeded RNG. */
