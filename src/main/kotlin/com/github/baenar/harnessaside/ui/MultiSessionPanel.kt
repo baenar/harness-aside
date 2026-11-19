@@ -178,7 +178,7 @@ class MultiSessionPanel(private val project: Project, private val toolWindow: To
         )
     }
 
-    /** The tab in the strip: its manul, and "–" to close it. Hovering it names the harness. */
+    /** The tab in the strip: its manul, and, while hovered, "–" to close it. Hovering it names the harness. */
     private inner class TabCard(private val tab: Tab) : JComponent() {
         var cat: Icon = tab.manul.icon(HarnessStatus.IDLE, 0, CAT_SIZE)
         private var hover = false
@@ -221,7 +221,7 @@ class MultiSessionPanel(private val project: Project, private val toolWindow: To
                     JBUI.scale(8).let { arc -> g2.fillRoundRect(0, 0, width, height, arc, arc) }
                 }
                 cat.paintIcon(this, g2, (width - cat.iconWidth) / 2, (height - cat.iconHeight) / 2)
-                if (hover || selected === tab) {
+                if (hover) {
                     val minus = AllIcons.General.Remove
                     val area = closeArea()
                     minus.paintIcon(this, g2, area.x + (area.width - minus.iconWidth) / 2, area.y + (area.height - minus.iconHeight) / 2)
