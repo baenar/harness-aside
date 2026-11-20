@@ -73,6 +73,9 @@ object ClaudeSessions {
         return Paths.get(home, ".claude", "projects", encodeProjectPath(path))
     }
 
+    fun hasSession(userHome: String, projectPath: String, sessionId: String): Boolean =
+        Files.exists(sessionsDir(userHome, projectPath).resolve("$sessionId.jsonl"))
+
     /** True when the project has a session to continue; a missing or unreadable directory means it hasn't. */
     fun hasSessions(userHome: String, projectPath: String): Boolean = runCatching {
         Files.list(sessionsDir(userHome, projectPath)).use { files -> files.anyMatch { it.name.endsWith(".jsonl") } }

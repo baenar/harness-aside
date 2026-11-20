@@ -70,7 +70,7 @@ class AntigravityStatusHooksTest {
         assertTrue(thinkingCmd.contains("echo '{}'"))
 
         val preToolCmd = AntigravityStatusHooks.preToolUseCommand()
-        assertTrue(preToolCmd.contains("run_command"))
+        assertTrue(preToolCmd.contains("ask_question"))
         assertTrue(preToolCmd.contains("waiting"))
         assertTrue(preToolCmd.contains("allow"))
 
@@ -83,7 +83,7 @@ class AntigravityStatusHooksTest {
     @Test
     fun `posix pre-tool command still matches every waiting tool`() {
         val cmd = AntigravityStatusHooks.preToolUseCommand()
-        assertTrue(cmd.contains("(run_command|ask_question|ask_permission|write_to_file|replace_file_content|multi_replace_file_content)"))
+        assertTrue(cmd.contains("(ask_question|ask_permission)"))
     }
 
     @Test

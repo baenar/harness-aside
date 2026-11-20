@@ -7,4 +7,6 @@ import com.github.baenar.harnessaside.opencode.OpenCodeHarness
 /** The harnesses the launcher offers, in display order. */
 object HarnessRegistry {
     val registered: List<Harness> = listOf(TerminalHarness, ClaudeHarness, AntigravityHarness, OpenCodeHarness)
+
+    fun find(id: String?): Harness? = registered.firstOrNull { it.id == id }
 }

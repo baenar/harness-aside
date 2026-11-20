@@ -30,7 +30,7 @@ class StatusIconsTest {
     @Test
     fun `every Manul icon file and frame exists on the classpath`() {
         val frames = (0 until 8).flatMap { listOf("manul_work_%02d".format(it), "manul_help_%02d".format(it)) }
-        for (name in listOf("manul-default", "manul-working", "manul-help", "harnessAside") + frames) {
+        for (name in listOf("manul-default") + frames) {
             assertNotNull("missing icon: /icons/$name.svg", javaClass.getResource("/icons/$name.svg"))
             assertNotNull("missing dark icon: /icons/${name}_dark.svg", javaClass.getResource("/icons/${name}_dark.svg"))
         }

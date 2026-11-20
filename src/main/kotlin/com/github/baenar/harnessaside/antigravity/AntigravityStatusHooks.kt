@@ -103,7 +103,7 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
             root.add(HOOK_NAME, JsonObject().apply {
                 add("SessionStart", hook(state("idle")))
                 add("PreInvocation", hook(state("thinking")))
-                // waiting for interactive tools (run_command, ask_question, file write/edit), else tool
+                // waiting for the tools that ask the user (ask_question, ask_permission), else tool
                 add("PreToolUse", toolHook(if (windows) windowsToolCommand("PreToolUse") else preToolUseCommand()))
                 // idle if error / rejected by user, else thinking
                 add("PostToolUse", toolHook(if (windows) windowsToolCommand("PostToolUse") else postToolUseCommand()))

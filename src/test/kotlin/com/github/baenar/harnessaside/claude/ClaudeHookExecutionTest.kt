@@ -26,11 +26,12 @@ class ClaudeHookExecutionTest {
 
     private val server = HarnessStatusServer()
     private val received = CopyOnWriteArrayList<HarnessStatus>()
+    private lateinit var token: String
     private lateinit var dir: Path
 
     @Before
     fun setUp() {
-        server.statusListener = { received.add(it) }
+        token = server.register { received.add(it) }
         server.ensureStarted()
         dir = tmp.newFolder(".claude").toPath()
         ClaudeStatusHooks(dir).install()
@@ -94,7 +95,7 @@ class ClaudeHookExecutionTest {
         received.clear()
         val input = payload.replaceFirst("{", """{"session_id":"s","hook_event_name":"$event",""")
         val query = JsonParser.parseString(input).asJsonObject.get(MATCH_FIELD[event] ?: "")?.asString
-        val env = mapOf("HARNESS_ASIDE_IDE_PORT" to server.port.toString(), "HARNESS_ASIDE_IDE_TOKEN" to server.token)
+        val env = mapOf("HARNESS_ASIDE_IDE_PORT" to server.port.toString(), "HARNESS_ASIDE_IDE_TOKEN" to token)
         for (entry in JsonParser.parseString(Files.readString(dir.resolve("settings.json"))).asJsonObject
             .getAsJsonObject("hooks").getAsJsonArray(event) ?: return null) {
             val matcher = entry.asJsonObject.get("matcher")?.asString

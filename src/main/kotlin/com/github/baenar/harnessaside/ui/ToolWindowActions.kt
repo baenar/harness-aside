@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import kotlin.reflect.KMutableProperty0
 
@@ -25,6 +26,8 @@ class EndSessionAction(private val toolWindow: ToolWindow) :
     }
 
     override fun update(e: AnActionEvent) {
+        // Multi-session tabs close with their own "–".
+        e.presentation.isVisible = e.project?.let(HarnessStatusManager::isMultiSession) == false
         e.presentation.isEnabled = HarnessToolWindowUi.hasActiveTerminal(toolWindow)
     }
 
@@ -39,6 +42,30 @@ class AlertOptionAction(text: String, description: String, private val option: K
 
     override fun setSelected(e: AnActionEvent, state: Boolean) {
         option.set(state)
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+}
+
+/**
+ * Gear-menu option: one terminal at a time, or several side by side in tabs. Switching rebuilds the tool
+ * window, which ends running sessions, so it asks first. Claude conversations can be resumed afterwards.
+ */
+class MultiSessionAction(private val toolWindow: ToolWindow) :
+    ToggleAction("Multiple Sessions", "Run several harnesses side by side, one tab each", null), DumbAware {
+
+    override fun isSelected(e: AnActionEvent): Boolean = e.project?.let(HarnessStatusManager::isMultiSession) ?: false
+
+    override fun setSelected(e: AnActionEvent, state: Boolean) {
+        val project = e.project ?: return
+        if (HarnessToolWindowUi.hasRunningSessions(toolWindow) && Messages.showOkCancelDialog(
+                project,
+                "Switching ends the running sessions. Claude conversations can be resumed afterwards.",
+                "Switch Session Mode", "Switch", "Cancel", null,
+            ) != Messages.OK
+        ) return
+        HarnessStatusManager.setMultiSession(project, state)
+        HarnessToolWindowUi.showMode(project, toolWindow)
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT

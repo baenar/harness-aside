@@ -3,11 +3,7 @@ package com.github.baenar.harnessaside.ui
 import com.github.baenar.harnessaside.claude.ClaudeHarness
 import com.github.baenar.harnessaside.core.Harness
 import com.github.baenar.harnessaside.core.HarnessRegistry
-import com.github.baenar.harnessaside.core.HarnessTerminalService
-import com.intellij.openapi.components.service
 import com.intellij.util.IconUtil
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
@@ -27,14 +23,10 @@ import javax.swing.JButton
 import javax.swing.JPanel
 
 /**
- * Empty-state panel displayed in the tool window when no harness session is currently active.
- *
- * Presents a list of supported harnesses from [HarnessRegistry] allowing the user to launch one.
+ * Empty-state panel: shown in the tool window when no harness session is active, and in a multi-session tab
+ * until a harness is picked. Lists the harnesses from [HarnessRegistry] and hands the picked one to [onLaunch].
  */
-class HarnessLauncherPanel(
-    private val project: Project,
-    private val toolWindow: ToolWindow,
-) : JBPanel<HarnessLauncherPanel>(BorderLayout()) {
+class HarnessLauncherPanel(private val onLaunch: (Harness) -> Unit) : JBPanel<HarnessLauncherPanel>(BorderLayout()) {
 
     init {
         border = JBUI.Borders.empty(16)
@@ -168,7 +160,5 @@ class HarnessLauncherPanel(
         return card
     }
 
-    private fun launchHarness(harness: Harness) {
-        project.service<HarnessTerminalService>().launch(toolWindow, harness)
-    }
+    private fun launchHarness(harness: Harness) = onLaunch(harness)
 }

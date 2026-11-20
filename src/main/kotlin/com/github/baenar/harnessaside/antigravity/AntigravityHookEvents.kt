@@ -8,11 +8,12 @@ import com.google.gson.JsonParser
  */
 object AntigravityHookEvents {
 
-    /** Tools that need the user (or write files), so `PreToolUse` reports WAITING instead of a plain tool run. */
-    val WAITING_TOOLS = listOf(
-        "run_command", "ask_question", "ask_permission",
-        "write_to_file", "replace_file_content", "multi_replace_file_content",
-    )
+    /**
+     * Tools that wait for the user whatever the permission mode, so `PreToolUse` reports WAITING instead of a plain
+     * tool run. A command or file edit only waits when agy asks to approve it, which no hook says (the payload has
+     * just the tool call), so they count as tool runs: better no alert for an approval than one for every command.
+     */
+    val WAITING_TOOLS = listOf("ask_question", "ask_permission")
 
     /** The state for [event] given its stdin JSON, or null for an event we don't handle. */
     fun state(event: String, stdin: String): String? = when (event) {

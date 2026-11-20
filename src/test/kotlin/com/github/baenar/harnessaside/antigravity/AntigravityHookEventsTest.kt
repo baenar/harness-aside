@@ -9,20 +9,22 @@ class AntigravityHookEventsTest {
     private fun pre(tool: String) = """{"conversationId":"c","toolCall":{"name":"$tool","args":{}},"stepIdx":1}"""
 
     @Test
-    fun `interactive and writing tools wait`() {
+    fun `tools that ask the user wait`() {
         for (tool in AntigravityHookEvents.WAITING_TOOLS) {
             assertEquals(tool, "waiting", AntigravityHookEvents.state("PreToolUse", pre(tool)))
         }
     }
 
     @Test
-    fun `other tools just run`() {
-        assertEquals("tool", AntigravityHookEvents.state("PreToolUse", pre("view_file")))
+    fun `other tools just run, commands and edits too`() {
+        for (tool in listOf("view_file", "run_command", "write_to_file", "replace_file_content")) {
+            assertEquals(tool, "tool", AntigravityHookEvents.state("PreToolUse", pre(tool)))
+        }
     }
 
     @Test
     fun `a tool name inside the arguments does not count`() {
-        val payload = """{"toolCall":{"name":"view_file","args":{"path":"run_command"}}}"""
+        val payload = """{"toolCall":{"name":"view_file","args":{"path":"ask_question"}}}"""
         assertEquals("tool", AntigravityHookEvents.state("PreToolUse", payload))
     }
 

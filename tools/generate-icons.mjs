@@ -8,10 +8,8 @@ const ICONS_DIR = path.resolve(__dirname, '../src/main/resources/icons');
 const LIGHT_COLOR = '#6C707E';
 const DARK_COLOR = '#CED0D6';
 
-// Read user's v3 source files as templates:
-const defaultV3Raw = fs.readFileSync(path.join(ICONS_DIR, 'manul-default-v3.svg'), 'utf8');
-const workingV3Raw = fs.readFileSync(path.join(ICONS_DIR, 'manul-working-v3.svg'), 'utf8');
-const helpV3Raw = fs.readFileSync(path.join(ICONS_DIR, 'manul-help-v3.svg'), 'utf8');
+// The idle icon template; the animation frames below are drawn from scratch:
+const defaultTemplate = fs.readFileSync(path.join(ICONS_DIR, 'manul-default-template.svg'), 'utf8');
 
 /**
  * Transforms an SVG to use explicit palette hex colors (#6C707E or #CED0D6)
@@ -29,39 +27,16 @@ function applyPaletteColors(svgContent, color) {
     .replace(/height="[^"]+"/, 'height="20"');
 }
 
-// 1. Write manul-default and harnessAside
-const defaultLight = applyPaletteColors(defaultV3Raw, LIGHT_COLOR);
-const defaultDark = applyPaletteColors(defaultV3Raw, DARK_COLOR);
+// 1. Write manul-default
+const defaultLight = applyPaletteColors(defaultTemplate, LIGHT_COLOR);
+const defaultDark = applyPaletteColors(defaultTemplate, DARK_COLOR);
 
 fs.writeFileSync(path.join(ICONS_DIR, 'manul-default.svg'), defaultLight, 'utf8');
 fs.writeFileSync(path.join(ICONS_DIR, 'manul-default_dark.svg'), defaultDark, 'utf8');
 fs.writeFileSync(path.join(ICONS_DIR, 'manul-default@20x20.svg'), defaultLight, 'utf8');
 fs.writeFileSync(path.join(ICONS_DIR, 'manul-default@20x20_dark.svg'), defaultDark, 'utf8');
 
-fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside.svg'), defaultLight, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside_dark.svg'), defaultDark, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside@20x20.svg'), defaultLight, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'harnessAside@20x20_dark.svg'), defaultDark, 'utf8');
-
-// 2. Write manul-working from manul-working-v3 (fully animated CSS SVG)
-const workingLight = applyPaletteColors(workingV3Raw, LIGHT_COLOR);
-const workingDark = applyPaletteColors(workingV3Raw, DARK_COLOR);
-
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working.svg'), workingLight, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working_dark.svg'), workingDark, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working@20x20.svg'), workingLight, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-working@20x20_dark.svg'), workingDark, 'utf8');
-
-// 3. Write manul-help from manul-help-v3 (fully animated CSS SVG)
-const helpLight = applyPaletteColors(helpV3Raw, LIGHT_COLOR);
-const helpDark = applyPaletteColors(helpV3Raw, DARK_COLOR);
-
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help.svg'), helpLight, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help_dark.svg'), helpDark, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help@20x20.svg'), helpLight, 'utf8');
-fs.writeFileSync(path.join(ICONS_DIR, 'manul-help@20x20_dark.svg'), helpDark, 'utf8');
-
-// 4. Generate 8 static frames for manul_work_00..07 (for IntelliJ Swing runtime animation)
+// 2. Generate 8 static frames for manul_work_00..07 (for IntelliJ Swing runtime animation)
 const EYE_OFFSETS = [0, 0, 1, 1, 0, 0, -1, -1];
 const DOT_CONFIGS = [
   { d1: { y: 1, op: 1.0 }, d2: { y: 2, op: 0.35 }, d3: { y: 2, op: 0.35 } },
@@ -112,7 +87,7 @@ for (let i = 0; i < 8; i++) {
   fs.writeFileSync(path.join(ICONS_DIR, `manul_work_${pad}@20x20_dark.svg`), dark, 'utf8');
 }
 
-// 5. Generate 8 static frames for manul_help_00..07 (for IntelliJ Swing runtime animation)
+// 3. Generate 8 static frames for manul_help_00..07 (for IntelliJ Swing runtime animation)
 const SHAKE_DX = [0, 0.7, 1.0, 0.7, 0, -0.7, -1.0, -0.7];
 
 function buildHelpFrame(frameIndex, color) {
@@ -147,4 +122,4 @@ for (let i = 0; i < 8; i++) {
   fs.writeFileSync(path.join(ICONS_DIR, `manul_help_${pad}@20x20_dark.svg`), dark, 'utf8');
 }
 
-console.log('Successfully generated all v3 Manul SVG icons with explicit palette colors!');
+console.log('Successfully generated all Manul SVG icons with explicit palette colors!');
