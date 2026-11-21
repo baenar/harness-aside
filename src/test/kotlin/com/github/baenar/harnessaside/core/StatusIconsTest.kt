@@ -41,6 +41,7 @@ class StatusIconsTest {
         assertNotNull("missing claude icon", javaClass.getResource("/icons/claude.svg"))
         assertNotNull("missing antigravity icon", javaClass.getResource("/icons/antigravity.svg"))
         assertNotNull("missing opencode icon", javaClass.getResource("/icons/opencode.svg"))
+        assertNotNull("missing mistral icon", javaClass.getResource("/icons/mistral.svg"))
     }
 
     @Test

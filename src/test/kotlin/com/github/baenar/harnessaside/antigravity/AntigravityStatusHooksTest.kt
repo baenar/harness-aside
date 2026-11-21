@@ -1,5 +1,6 @@
 package com.github.baenar.harnessaside.antigravity
 
+import com.github.baenar.harnessaside.core.isWindowsTarget
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
@@ -129,11 +130,11 @@ class AntigravityStatusHooksTest {
 
     @Test
     fun `windows target is native windows only`() {
-        assertTrue(AntigravityStatusHooks.isWindowsTarget("Windows 11", "C:\\Users\\me"))
-        assertFalse("WSL home read by agy under sh", AntigravityStatusHooks.isWindowsTarget("Windows 11", "//wsl$/Debian/home/me"))
-        assertFalse(AntigravityStatusHooks.isWindowsTarget("Windows 11", "\\\\wsl.localhost\\Debian\\home\\me"))
-        assertFalse(AntigravityStatusHooks.isWindowsTarget("Linux", "/home/me"))
-        assertFalse(AntigravityStatusHooks.isWindowsTarget("Mac OS X", "/Users/me"))
+        assertTrue(isWindowsTarget("Windows 11", "C:\\Users\\me"))
+        assertFalse("WSL home read by agy under sh", isWindowsTarget("Windows 11", "//wsl$/Debian/home/me"))
+        assertFalse(isWindowsTarget("Windows 11", "\\\\wsl.localhost\\Debian\\home\\me"))
+        assertFalse(isWindowsTarget("Linux", "/home/me"))
+        assertFalse(isWindowsTarget("Mac OS X", "/Users/me"))
     }
 
     private fun commandsOf(group: JsonObject): List<String> = group.entrySet().flatMap { (_, entries) ->

@@ -3,7 +3,7 @@
     <name>Harness Aside</name>
     <vendor>baenar</vendor>
     <description><![CDATA[
-        Runs AI coding harnesses (Claude Code, Antigravity CLI, OpenCode) in a dedicated terminal tool window, docked on the right.
+        Runs AI coding harnesses (Claude Code, Antigravity CLI, OpenCode, Mistral Vibe) in a dedicated terminal tool window, docked on the right.
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
