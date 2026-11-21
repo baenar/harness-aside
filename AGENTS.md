@@ -71,3 +71,7 @@ All code modifications must strictly adhere to the following principles:
 ### 4. Cross-Platform Path Handling
 * Never assume a standard POSIX or Windows-only filesystem.
 * When interacting with paths, always account for WSL environments, Windows drive letters, and UNC network paths (`\\wsl$\`, `\\wsl.localhost\`).
+
+### 5. Release Versioning
+* **Keep `gradle.properties` in sync with the release tag**: every release `vX.Y.Z` must have `version = X.Y.Z` in `gradle.properties`, committed *before* the tag is created. The release workflow takes the version from the tag, but local builds use the file, so a stale value makes them report the wrong version.
+* **Order of steps**: bump `gradle.properties` in a commit on `main`, then `git tag -a vX.Y.Z` on that commit and `git push origin vX.Y.Z`.
