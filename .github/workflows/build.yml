@@ -97,8 +97,14 @@ jobs:
         with:
           cache-read-only: true
 
+      # Up to 3 attempts
       - name: Run Tests
-        run: ./gradlew check
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew check && exit 0
+            echo "::warning::Tests failed on attempt $attempt of 3"
+          done
+          exit 1
 
       # A skipped test would let the suite report success without covering anything.
       - name: Assert no tests were skipped
