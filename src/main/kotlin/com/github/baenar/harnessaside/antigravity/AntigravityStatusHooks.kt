@@ -1,6 +1,7 @@
 package com.github.baenar.harnessaside.antigravity
 
 import com.github.baenar.harnessaside.claude.ClaudeSessions
+import com.github.baenar.harnessaside.core.isWindowsTarget
 import com.github.baenar.harnessaside.core.postStatusCommand
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
@@ -59,13 +60,6 @@ class AntigravityStatusHooks(private val configDir: Path, private val windows: B
             val windows = isWindowsTarget(System.getProperty("os.name"), storage.userHome)
             return AntigravityStatusHooks(Paths.get(storage.userHome, ".gemini", "config"), windows)
         }
-
-        /**
-         * True when the `hooks.json` at [userHome] is read by a native Windows `agy`. A Windows IDE with the
-         * project inside WSL writes to the distro's home, where `agy` runs under `sh`.
-         */
-        fun isWindowsTarget(osName: String, userHome: String): Boolean =
-            osName.startsWith("Windows", ignoreCase = true) && !ClaudeSessions.isWsl(userHome)
 
         /** Agy reads a hook's stdout as JSON, so every POSIX command ends by printing some. */
         fun curlCommand(state: String): String = "${postStatusCommand(state)}; echo '{}'"

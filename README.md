@@ -8,7 +8,7 @@
   <a href="https://github.com/baenar/harness-aside/actions/workflows/build.yml"><img src="https://github.com/baenar/harness-aside/actions/workflows/build.yml/badge.svg" alt="Build" /></a>
 </p>
 
-Personal IntelliJ/PyCharm plugin: AI harnesses (Claude Code, Antigravity CLI, OpenCode) in a dedicated terminal tool window, docked on the right.
+Personal IntelliJ/PyCharm plugin: AI harnesses (Claude Code, Antigravity CLI, OpenCode, Mistral Vibe) in a dedicated terminal tool window, docked on the right.
 One session at a time, or several side by side in tabs (options menu → Multiple Sessions), each tab with its own generated manul showing its status.
 
 Verified on **Windows**, **WSL**, and **Linux**.
@@ -36,6 +36,8 @@ still glyph.
 Status hooks last verified by hand against **Antigravity CLI 1.4.6** (WSL) and **1.4.4** (native Windows),
 and **Claude Code 2.1.309** (WSL). OpenCode has no shell hooks: launching it writes a plugin to
 `~/.config/opencode/plugins/harness-aside-status.js`, written against **OpenCode 1.19.3**.
+Mistral Vibe's hooks go into a marked block at the end of `~/.vibe/hooks.toml`, written against **Vibe 3.1.4**
+(the rest of the file is left alone).
 
 IDEs: developed and run against IntelliJ IDEA Community. PyCharm should load it — the
 plugin depends only on the platform and the terminal — but that is untested too.

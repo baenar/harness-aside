@@ -3,6 +3,7 @@ package com.github.baenar.harnessaside.antigravity
 import com.github.baenar.harnessaside.core.HarnessStatus
 import com.github.baenar.harnessaside.core.HarnessStatusServer
 import com.github.baenar.harnessaside.core.HookShell
+import com.github.baenar.harnessaside.core.isWindowsTarget
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -58,7 +59,7 @@ class AntigravityHookExecutionTest {
         token = server.register { received.add(it) }
         server.ensureStarted()
         configDir = tmp.newFolder("config").toPath()
-        val windows = AntigravityStatusHooks.isWindowsTarget(System.getProperty("os.name"), System.getProperty("user.home"))
+        val windows = isWindowsTarget(System.getProperty("os.name"), System.getProperty("user.home"))
         assertTrue(AntigravityStatusHooks(configDir, windows).install())
 
         val curl = HookShell.run(if (HookShell.isWindows) "curl.exe --version" else "curl --version", configDir)
